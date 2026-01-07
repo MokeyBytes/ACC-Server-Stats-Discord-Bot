@@ -3,7 +3,14 @@
 A Discord bot for Assetto Corsa Competizione servers that automatically tracks lap times, announces records, and provides detailed statistics.
 
 ---
-<img width="595" height="749" alt="image" src="https://github.com/user-attachments/assets/42c04e33-92bd-4c84-bf07-ab69c9f5ed32" />
+<p align="center">
+  <img
+    src="https://github.com/user-attachments/assets/42c04e33-92bd-4c84-bf07-ab69c9f5ed32"
+    alt="image"
+    width="595"
+    height="749"
+  />
+</p>
 
 ## 🎮 Features
 
