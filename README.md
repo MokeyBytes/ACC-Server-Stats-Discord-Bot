@@ -351,4 +351,8 @@ Important:
 
 ## 📄 License
 
-MIT
+This project is licensed under the **GNU General Public License v3.0**.
+
+See the [LICENSE](LICENSE) file for the full license text.
+
+**Copyright (C) 2024 ACC Server Stats Discord Bot contributors**
