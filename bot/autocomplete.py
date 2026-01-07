@@ -113,19 +113,26 @@ async def player_name_autocomplete(
         players = fetch_all_players(con)
         con.close()
         
+        if not players:
+            return []
+        
         # Create full names
         full_names = []
         for first, last in players:
-            if first or last:
-                full_name = f"{first or ''} {last or ''}".strip()
-                if full_name:
-                    full_names.append(full_name)
+            try:
+                if first or last:
+                    full_name = f"{first or ''} {last or ''}".strip()
+                    if full_name:
+                        full_names.append(full_name)
+            except Exception as e:
+                print(f"[WARN] Error processing player name: {e}")
+                continue
+        
+        if not full_names:
+            return []
         
         # Remove duplicates and sort
         unique_names = sorted(set(full_names))
-        
-        if not unique_names:
-            return []
         
         # Filter based on current input
         current_lower = current.lower() if current else ""
@@ -144,8 +151,10 @@ async def player_name_autocomplete(
         
         return matches
     except Exception as e:
-        print(f"[WARN] Error in player_name autocomplete: {e}")
+        # Log error but return empty list to prevent Discord from showing error
+        print(f"[ERR] Error in player_name autocomplete: {e}")
         import traceback
         traceback.print_exc()
+        # Return empty list so Discord doesn't show error to user
         return []
 
