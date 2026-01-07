@@ -153,7 +153,7 @@ Posted automatically after each race:
 ### Prerequisites
 - Python 3.10+
 - Discord Bot Token
-- ACC Server with results output
+- ACC Server with results output enabled
 
 ### 1. Install Dependencies
 ```bash
@@ -169,7 +169,21 @@ $env:DISCORD_TOKEN = "your_token_here"
 [Environment]::SetEnvironmentVariable("DISCORD_TOKEN", "your_token_here", "User")
 ```
 
-### 3. Configure Paths
+### 3. Configure ACC Server
+
+**Important:** The ACC server must be configured to dump leaderboard data.
+
+In your ACC server's configuration file `server/cfg/settings.json`, ensure:
+
+```json
+{
+  "dumpLeaderboards": 1
+}
+```
+
+This setting enables the server to generate the JSON result files that the bot imports. Without this, no race data will be available.
+
+### 4. Configure Paths
 Edit `config.py`:
 ```python
 DB_PATH = r"C:\accserver\stats\acc_stats.sqlite"  # Your database path
@@ -177,12 +191,12 @@ CHANNEL_ID = 123456789012345678                    # Your Discord channel ID
 IMG_DIR = r"C:\accserver\stats\img"               # Track images folder
 ```
 
-### 4. Run the Bot
+### 5. Run the Bot
 ```bash
 py run_bot.py
 ```
 
-### 5. Run File Watcher (Separate Terminal)
+### 6. Run File Watcher (Separate Terminal)
 ```powershell
 .\watch_results.ps1
 ```
