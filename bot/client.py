@@ -16,6 +16,7 @@ from bot.commands.pb import setup_pb_command
 from bot.commands.leaders import setup_leaders_command
 from bot.commands.tracks import setup_tracks_command
 from bot.commands.sync import setup_sync_command
+from bot.commands.help import setup_help_command
 
 
 def create_bot() -> tuple[discord.Client, app_commands.CommandTree]:
@@ -30,6 +31,7 @@ def create_bot() -> tuple[discord.Client, app_commands.CommandTree]:
     setup_leaders_command(tree)
     setup_tracks_command(tree)
     setup_sync_command(tree)
+    setup_help_command(tree)
     
     @client.event
     async def on_ready():

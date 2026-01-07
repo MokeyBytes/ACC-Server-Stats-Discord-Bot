@@ -27,31 +27,59 @@ def setup_tracks_command(tree: app_commands.CommandTree):
         con.close()
 
         if not available:
-            await interaction.followup.send("No tracks found in the database yet.")
+            embed = discord.Embed(
+                title="📍 Available Tracks",
+                description="No tracks found in the database yet.",
+                color=discord.Color.orange()
+            )
+            await interaction.followup.send(embed=embed)
             return
 
         # Format track list
         track_names = [t[0] for t in available]
-        track_list = "\n".join([f"• {name}" for name in track_names])
+        sorted_tracks = sorted(track_names)
         
-        msg = f"**Available Tracks ({len(track_names)}):**\n\n{track_list}\n\n*Use `/records <trackname>` to see top times for a track.*"
+        # Create embed
+        embed = discord.Embed(
+            title="📍 Available Tracks",
+            description=f"**{len(sorted_tracks)}** track(s) available in the database",
+            color=discord.Color.blue()
+        )
         
-        # Discord message limit safety
-        if len(msg) <= 1900:
-            await interaction.followup.send(msg)
+        # Format track list (Discord field value limit is 1024 characters)
+        track_list = "\n".join([f"• {name}" for name in sorted_tracks])
+        
+        # If track list is too long, split into multiple fields
+        if len(track_list) <= 1024:
+            embed.add_field(
+                name="Track List",
+                value=track_list,
+                inline=False
+            )
         else:
-            # Split into chunks if too long
+            # Split into chunks
             chunks = []
-            current_chunk = f"**Available Tracks ({len(track_names)}):**\n\n"
-            for name in track_names:
+            current_chunk = ""
+            for name in sorted_tracks:
                 line = f"• {name}\n"
-                if len(current_chunk) + len(line) > 1900:
-                    chunks.append(current_chunk)
-                    current_chunk = ""
-                current_chunk += line
+                if len(current_chunk) + len(line) > 1024:
+                    chunks.append(current_chunk.strip())
+                    current_chunk = line
+                else:
+                    current_chunk += line
             if current_chunk:
-                chunks.append(current_chunk + "\n*Use `/records <trackname>` to see top times for a track.*")
+                chunks.append(current_chunk.strip())
             
-            for chunk in chunks:
-                await interaction.followup.send(chunk)
+            # Add chunks as separate fields
+            for i, chunk in enumerate(chunks, 1):
+                field_name = "Track List" if i == 1 else f"Track List (continued {i})"
+                embed.add_field(
+                    name=field_name,
+                    value=chunk,
+                    inline=False
+                )
+        
+        embed.set_footer(text="💡 Use /records <trackname> to see top times for a track")
+        
+        await interaction.followup.send(embed=embed)
 
