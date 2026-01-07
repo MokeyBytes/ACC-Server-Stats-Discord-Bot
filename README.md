@@ -78,4 +78,3 @@ ACC-Stats/
 ## License
 
 MIT
-
