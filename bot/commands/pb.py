@@ -1,23 +1,25 @@
-"""Personal bests command - show player's PBs across all tracks."""
+"""Personal bests command - show player's PB with detailed sector breakdown for a specific track."""
 import sqlite3
+import json
 import discord
 from discord import app_commands
 
 from config import DB_PATH, CHANNEL_ID
 from db.queries import (
-    fetch_player_pbs, get_player_rank, get_track_record, 
-    get_session_count, get_previous_pb, calculate_performance_percentage
+    find_track_match, fetch_player_pb_with_sectors, fetch_track_record_with_sectors,
+    get_player_rank, get_session_count, get_previous_pb
 )
 from utils.formatting import fmt_ms, fmt_dt, fmt_split_ms, fmt_car_model
-from bot.autocomplete import player_name_autocomplete
+from utils.images import find_track_image
+from bot.autocomplete import player_name_autocomplete, track_autocomplete
 
 
 def setup_pb_command(tree: app_commands.CommandTree):
     """Register the /pb command."""
     
-    @tree.command(name="pb", description="Show personal bests for a player across all tracks")
-    @app_commands.autocomplete(player=player_name_autocomplete)
-    async def pb(interaction: discord.Interaction, player: str):
+    @tree.command(name="pb", description="Show detailed personal best with sector breakdown for a player at a track")
+    @app_commands.autocomplete(player=player_name_autocomplete, track=track_autocomplete)
+    async def pb(interaction: discord.Interaction, player: str, track: str):
         # Only allow in your target channel (optional safety)
         if interaction.channel_id != CHANNEL_ID:
             await interaction.response.send_message(
@@ -29,9 +31,8 @@ def setup_pb_command(tree: app_commands.CommandTree):
         await interaction.response.defer(thinking=True)
 
         # Parse full name into first and last name
-        name_parts = player.strip().split(None, 1)  # Split on first space only
+        name_parts = player.strip().split(None, 1)
         if len(name_parts) == 1:
-            # Only one name provided - treat as first name
             first_name = name_parts[0]
             last_name = ""
         else:
@@ -39,197 +40,243 @@ def setup_pb_command(tree: app_commands.CommandTree):
             last_name = name_parts[1]
 
         con = sqlite3.connect(DB_PATH)
-        pbs = fetch_player_pbs(con, first_name, last_name)
-
-        if not pbs:
+        
+        # Find matching track name
+        actual_track = find_track_match(con, track)
+        if not actual_track:
             con.close()
             await interaction.followup.send(
-                f"No personal bests found for **{player}**.\n\n"
+                f"Track **{track}** not found.\n"
+                f"Use `/tracks` to see all available tracks."
+            )
+            return
+
+        # Get PB data for both Q and R
+        q_pb = fetch_player_pb_with_sectors(con, first_name or "", last_name or "", actual_track, "Q")
+        r_pb = fetch_player_pb_with_sectors(con, first_name or "", last_name or "", actual_track, "R")
+
+        if not q_pb and not r_pb:
+            con.close()
+            await interaction.followup.send(
+                f"No personal bests found for **{player}** at **{actual_track}**.\n\n"
                 f"*Make sure you've spelled the name correctly.*"
             )
             return
 
+        # Get track records for comparison
+        q_record = fetch_track_record_with_sectors(con, actual_track, "Q")
+        r_record = fetch_track_record_with_sectors(con, actual_track, "R")
+
         # Create embed
-        player_name = player.strip()
         embed = discord.Embed(
-            title=f"🎯 Personal Bests: {player_name}",
+            title=f"🎯 Personal Best: {player}",
+            description=f"🏁 **{actual_track}**",
             color=discord.Color.green()
         )
 
-        # Group by track and get additional stats
-        tracks_dict = {}
-        for track, stype, best_ms, car_model, set_at_utc in pbs:
-            if track not in tracks_dict:
-                tracks_dict[track] = {'q': None, 'r': None}
-            
-            car_name = fmt_car_model(car_model)
-            when = fmt_dt(set_at_utc) if set_at_utc else "Unknown time"
-            
-            # Get additional stats (use parsed names)
-            rank, total = get_player_rank(con, track, stype, best_ms, first_name or "", last_name or "")
-            track_record = get_track_record(con, track, stype)
-            session_count = get_session_count(con, track, stype, first_name or "", last_name or "")
-            previous_pb = get_previous_pb(con, track, stype, best_ms, first_name or "", last_name or "")
-            
-            # Calculate gap to track record
-            gap_to_record = None
-            if track_record:
-                gap_ms = best_ms - track_record
-                gap_to_record = gap_ms
-            
-            # Calculate trend (faster/slower than previous PB)
-            trend = None
-            if previous_pb:
-                if best_ms < previous_pb:
-                    trend = "faster"  # Improved (lower time is better)
-                elif best_ms > previous_pb:
-                    trend = "slower"  # Got worse
-                else:
-                    trend = "equal"
-            
-            # Calculate performance percentage
-            perf_pct = calculate_performance_percentage(best_ms, track_record)
-            
-            tracks_dict[track][stype.lower()] = {
-                'time': best_ms,
-                'car': car_name,
-                'date': when,
-                'rank': rank,
-                'total': total,
-                'gap_to_record': gap_to_record,
-                'track_record': track_record,
-                'session_count': session_count,
-                'trend': trend,
-                'perf_pct': perf_pct
-            }
+        # Add track image thumbnail
+        img_filename, img_file = find_track_image(actual_track)
+        if img_file:
+            embed.set_thumbnail(url=f"attachment://{img_filename}")
 
-        # Build embed fields with all stats
-        medals = {1: "🥇", 2: "🥈", 3: "🥉"}
-        favorite_track = None
-        best_perf_pct = None
-        
-        for track in sorted(tracks_dict.keys()):
-            track_data = tracks_dict[track]
-            track_text = []
+        # Helper function to parse sectors from JSON
+        def parse_sectors(splits_json):
+            if not splits_json:
+                return None
+            try:
+                return json.loads(splits_json)
+            except:
+                return None
+
+        # Helper function to format sector breakdown
+        def format_sector_breakdown(pb_splits, record_splits, pb_time, record_time):
+            if not pb_splits:
+                return "No sector data available"
             
-            if track_data['q']:
-                q_data = track_data['q']
-                rank = q_data['rank']
-                total = q_data['total']
-                medal = medals.get(rank, "")
-                rank_text = f"#{rank} of {total}" if rank and total else "?"
+            sector_lines = []
+            num_sectors = len(pb_splits)
+            
+            # Calculate cumulative times for comparison
+            pb_cumulative = []
+            record_cumulative = []
+            pb_sum = 0
+            record_sum = 0
+            
+            for i, pb_s in enumerate(pb_splits):
+                pb_sum += pb_s
+                pb_cumulative.append(pb_sum)
                 
-                # Build the line with all info
-                if rank and rank <= 3:
-                    line_parts = [f"🏁 **Q**: {medal} **{fmt_ms(q_data['time'])}**"]
+                if record_splits and i < len(record_splits):
+                    record_sum += record_splits[i]
+                    record_cumulative.append(record_sum)
                 else:
-                    line_parts = [f"🏁 **Q**: {fmt_ms(q_data['time'])}"]
+                    record_cumulative.append(None)
+
+            # Build sector comparison lines
+            sector_gaps = []
+            for i in range(num_sectors):
+                sector_num = i + 1
+                pb_sector = pb_splits[i]
+                pb_cum = pb_cumulative[i]
                 
-                line_parts.append(f"({q_data['car']})")
+                sector_str = f"**S{sector_num}**: {fmt_ms(pb_sector)}"
                 
-                # Rank
-                if rank and total:
-                    line_parts.append(f"**#{rank} of {total}**")
-                elif rank_text != "?":
-                    line_parts.append(rank_text)
-                
-                # Gap to track record
-                if q_data['gap_to_record'] is not None:
-                    gap_str = fmt_split_ms(q_data['gap_to_record'])
-                    line_parts.append(f"*{gap_str} off record*")
-                
-                # Session count
-                if q_data['session_count'] > 0:
-                    sessions_text = f"{q_data['session_count']} session" + ("s" if q_data['session_count'] > 1 else "")
-                    line_parts.append(f"({sessions_text})")
-                
-                # Trend indicator - use 📈📉 for better visual clarity
-                if q_data['trend']:
-                    if q_data['trend'] == "faster":
-                        trend_emoji = "📈"  # Improving (faster time = lower)
-                    elif q_data['trend'] == "slower":
-                        trend_emoji = "📉"  # Declining (slower time = higher)
-                    else:
-                        trend_emoji = "➡️"  # Equal
-                    line_parts.append(trend_emoji)
-                
-                track_text.append(" ".join(line_parts))
-                
-                # Track favorite track (best performance percentage)
-                if q_data['perf_pct'] is not None:
-                    if best_perf_pct is None or q_data['perf_pct'] < best_perf_pct:
-                        best_perf_pct = q_data['perf_pct']
-                        favorite_track = (track, "Q", q_data['perf_pct'])
-            
-            if track_data['r']:
-                r_data = track_data['r']
-                rank = r_data['rank']
-                total = r_data['total']
-                medal = medals.get(rank, "")
-                rank_text = f"#{rank} of {total}" if rank and total else "?"
-                
-                # Build the line with all info
-                if rank and rank <= 3:
-                    line_parts = [f"🏎️ **R**: {medal} **{fmt_ms(r_data['time'])}**"]
+                if record_splits and i < len(record_splits):
+                    record_sector = record_splits[i]
+                    record_cum = record_cumulative[i]
+                    
+                    # Sector time difference
+                    sector_diff = pb_sector - record_sector
+                    if sector_diff < 0:
+                        sector_str += f" *(-{fmt_split_ms(abs(sector_diff))})* ✅"
+                    elif sector_diff > 0:
+                        sector_str += f" *(+{fmt_split_ms(sector_diff)})*"
+                    
+                    sector_gaps.append(sector_diff)
                 else:
-                    line_parts = [f"🏎️ **R**: {fmt_ms(r_data['time'])}"]
+                    sector_gaps.append(None)
                 
-                line_parts.append(f"({r_data['car']})")
-                
-                # Rank
-                if rank and total:
-                    line_parts.append(f"**#{rank} of {total}**")
-                elif rank_text != "?":
-                    line_parts.append(rank_text)
-                
-                # Gap to track record
-                if r_data['gap_to_record'] is not None:
-                    gap_str = fmt_split_ms(r_data['gap_to_record'])
-                    line_parts.append(f"*{gap_str} off record*")
-                
-                # Session count
-                if r_data['session_count'] > 0:
-                    sessions_text = f"{r_data['session_count']} session" + ("s" if r_data['session_count'] > 1 else "")
-                    line_parts.append(f"({sessions_text})")
-                
-                # Trend indicator - use 📈📉 for better visual clarity
-                if r_data['trend']:
-                    if r_data['trend'] == "faster":
-                        trend_emoji = "📈"  # Improving (faster time = lower)
-                    elif r_data['trend'] == "slower":
-                        trend_emoji = "📉"  # Declining (slower time = higher)
-                    else:
-                        trend_emoji = "➡️"  # Equal
-                    line_parts.append(trend_emoji)
-                
-                track_text.append(" ".join(line_parts))
-                
-                # Track favorite track (best performance percentage)
-                if r_data['perf_pct'] is not None:
-                    if best_perf_pct is None or r_data['perf_pct'] < best_perf_pct:
-                        best_perf_pct = r_data['perf_pct']
-                        favorite_track = (track, "R", r_data['perf_pct'])
+                sector_lines.append(sector_str)
+
+            # Add summary: strongest/weakest sectors
+            if record_splits and len(sector_gaps) == len(record_splits):
+                valid_gaps = [(i, g) for i, g in enumerate(sector_gaps) if g is not None]
+                if valid_gaps:
+                    # Find strongest (best relative to record) and weakest
+                    best_item = min(valid_gaps, key=lambda x: x[1])
+                    worst_item = max(valid_gaps, key=lambda x: x[1])
+                    
+                    best_idx = best_item[0]
+                    worst_idx = worst_item[0]
+                    best_gap = best_item[1]
+                    worst_gap = worst_item[1]
+                    
+                    summary_lines = []
+                    if best_gap < 0:
+                        summary_lines.append(f"🏆 **Strongest**: S{best_idx + 1} ({fmt_split_ms(abs(best_gap))} faster than record)")
+                    if worst_gap > 0:
+                        summary_lines.append(f"💪 **Weakest**: S{worst_idx + 1} ({fmt_split_ms(worst_gap)} slower than record)")
+
+                    if summary_lines:
+                        sector_lines.append("")  # Empty line
+                        sector_lines.extend(summary_lines)
+
+            return "\n".join(sector_lines)
+
+        # Qualifying section
+        if q_pb:
+            q_best_ms, q_splits_json, q_car_model, q_set_at_utc = q_pb
+            q_splits = parse_sectors(q_splits_json)
             
-            if track_text:
+            # Get track record sectors
+            q_record_splits = None
+            q_record_time = None
+            if q_record:
+                q_record_time = q_record[0]
+                q_record_splits_json = q_record[1] if len(q_record) > 1 else None
+                q_record_splits = parse_sectors(q_record_splits_json)
+            
+            # Build qualifying field
+            q_value = f"⏱️ **Time**: {fmt_ms(q_best_ms)}\n"
+            q_value += f"🚗 **Car**: {fmt_car_model(q_car_model)}\n"
+            
+            if q_set_at_utc:
+                q_value += f"📅 **Set**: {fmt_dt(q_set_at_utc)}\n"
+            
+            # Add rank
+            rank, total = get_player_rank(con, actual_track, "Q", q_best_ms, first_name or "", last_name or "")
+            if rank and total:
+                medal = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else ""
+                q_value += f"📊 **Rank**: {medal} #{rank} of {total}\n"
+            
+            # Add gap to record
+            if q_record_time:
+                gap_ms = q_best_ms - q_record_time
+                gap_str = fmt_split_ms(gap_ms)
+                if gap_ms < 0:
+                    q_value += f"🏆 **vs Record**: {gap_str} faster! 🔥\n"
+                else:
+                    q_value += f"🏆 **vs Record**: +{gap_str}\n"
+            
+            # Add session count
+            session_count = get_session_count(con, actual_track, "Q", first_name or "", last_name or "")
+            if session_count > 0:
+                q_value += f"🔄 **Sessions**: {session_count}\n"
+            
+            embed.add_field(
+                name="🏁 Qualifying",
+                value=q_value,
+                inline=False
+            )
+            
+            # Add sector breakdown if available
+            if q_splits:
+                sector_text = format_sector_breakdown(q_splits, q_record_splits, q_best_ms, q_record_time)
                 embed.add_field(
-                    name=f"**{track}**",
-                    value="\n".join(track_text),
+                    name="⚡ Sector Breakdown (Q)",
+                    value=sector_text,
                     inline=False
                 )
-        
+
+        # Race section
+        if r_pb:
+            r_best_ms, r_splits_json, r_car_model, r_set_at_utc = r_pb
+            r_splits = parse_sectors(r_splits_json)
+            
+            # Get track record sectors
+            r_record_splits = None
+            r_record_time = None
+            if r_record:
+                r_record_time = r_record[0]
+                r_record_splits_json = r_record[1] if len(r_record) > 1 else None
+                r_record_splits = parse_sectors(r_record_splits_json)
+            
+            # Build race field
+            r_value = f"⏱️ **Time**: {fmt_ms(r_best_ms)}\n"
+            r_value += f"🚗 **Car**: {fmt_car_model(r_car_model)}\n"
+            
+            if r_set_at_utc:
+                r_value += f"📅 **Set**: {fmt_dt(r_set_at_utc)}\n"
+            
+            # Add rank
+            rank, total = get_player_rank(con, actual_track, "R", r_best_ms, first_name or "", last_name or "")
+            if rank and total:
+                medal = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else ""
+                r_value += f"📊 **Rank**: {medal} #{rank} of {total}\n"
+            
+            # Add gap to record
+            if r_record_time:
+                gap_ms = r_best_ms - r_record_time
+                gap_str = fmt_split_ms(gap_ms)
+                if gap_ms < 0:
+                    r_value += f"🏆 **vs Record**: {gap_str} faster! 🔥\n"
+                else:
+                    r_value += f"🏆 **vs Record**: +{gap_str}\n"
+            
+            # Add session count
+            session_count = get_session_count(con, actual_track, "R", first_name or "", last_name or "")
+            if session_count > 0:
+                r_value += f"🔄 **Sessions**: {session_count}\n"
+            
+            embed.add_field(
+                name="🏎️ Race",
+                value=r_value,
+                inline=False
+            )
+            
+            # Add sector breakdown if available
+            if r_splits:
+                sector_text = format_sector_breakdown(r_splits, r_record_splits, r_best_ms, r_record_time)
+                embed.add_field(
+                    name="⚡ Sector Breakdown (R)",
+                    value=sector_text,
+                    inline=False
+                )
+
         con.close()
 
-        # Add favorite track to footer (best performance relative to track record)
-        footer_text = f"Total tracks: {len(tracks_dict)}"
-        if favorite_track:
-            track_name, stype, perf_pct = favorite_track
-            gap_pct = perf_pct - 100.0
-            if gap_pct > 0:
-                footer_text += f" | ⭐ Favorite: {track_name} ({stype}, +{gap_pct:.2f}% off record)"
-            else:
-                footer_text += f" | ⭐ Favorite: {track_name} ({stype}, {abs(gap_pct):.2f}% faster than record!)"
-        
-        embed.set_footer(text=footer_text)
-        
-        await interaction.followup.send(embed=embed)
-
+        # Send embed
+        if img_file:
+            await interaction.followup.send(embed=embed, file=img_file)
+        else:
+            await interaction.followup.send(embed=embed)

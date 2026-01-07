@@ -455,6 +455,60 @@ def fetch_race_session_data(con: sqlite3.Connection, session_id: int):
     return session, entries
 
 
+def fetch_player_pb_with_sectors(con: sqlite3.Connection, first_name: str, last_name: str, track: str, session_type: str):
+    """
+    Get player's personal best for a specific track/session with sector data.
+    Returns: (best_lap_ms, best_splits_json, car_model, set_at_utc) or None
+    """
+    result = con.execute(
+        """
+        SELECT 
+            e.best_lap_ms,
+            e.best_splits_json,
+            e.car_model,
+            MIN(s.file_mtime_utc) as set_at_utc
+        FROM entries e
+        JOIN sessions s ON e.session_id = s.session_id
+        WHERE s.track = ?
+          AND UPPER(s.session_type) = ?
+          AND e.best_lap_ms IS NOT NULL
+          AND e.first_name = ?
+          AND e.last_name = ?
+        GROUP BY e.first_name, e.last_name
+        ORDER BY e.best_lap_ms ASC
+        LIMIT 1
+        """,
+        (track, session_type, first_name, last_name)
+    ).fetchone()
+    
+    return result
+
+
+def fetch_track_record_with_sectors(con: sqlite3.Connection, track: str, session_type: str):
+    """
+    Get track record with sector data.
+    Returns: (best_lap_ms, best_splits_json) or None
+    """
+    result = con.execute(
+        """
+        SELECT r.best_lap_ms,
+               (SELECT e.best_splits_json 
+                FROM entries e 
+                JOIN sessions s ON e.session_id = s.session_id
+                WHERE s.track = r.track 
+                  AND UPPER(s.session_type) = r.session_type
+                  AND e.best_lap_ms = r.best_lap_ms
+                  AND e.best_splits_json IS NOT NULL
+                LIMIT 1) as best_splits_json
+        FROM records r
+        WHERE r.track = ? AND r.session_type = ?
+        """,
+        (track, session_type)
+    ).fetchone()
+    
+    return result
+
+
 def mark_race_results_sent(con: sqlite3.Connection, announcement_id: int, message_id: int):
     """Mark a race results announcement as sent."""
     con.execute(

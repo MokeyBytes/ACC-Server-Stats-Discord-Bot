@@ -67,37 +67,37 @@ def maybe_update_records(cur, session_id: int):
     ).fetchone()
 
     is_new_record = (existing is None) or (best_lap_ms < existing[0])
-    
+
     # Track record handling
     if is_new_record:
-        cur.execute(
-            """
-            INSERT INTO records
-            (track, session_type, best_lap_ms, player_id, first_name, last_name, short_name, car_model, race_number, cup_category, set_session_id, set_at_utc)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(track, session_type) DO UPDATE SET
-              best_lap_ms     = excluded.best_lap_ms,
-              player_id       = excluded.player_id,
-              first_name      = excluded.first_name,
-              last_name       = excluded.last_name,
-              short_name      = excluded.short_name,
-              car_model       = excluded.car_model,
-              race_number     = excluded.race_number,
-              cup_category    = excluded.cup_category,
-              set_session_id  = excluded.set_session_id,
-              set_at_utc      = excluded.set_at_utc
-            """,
-            (track, stype, best_lap_ms, player_id, first_name, last_name, short_name, car_model, race_number, cup_category, session_id, file_mtime_utc)
-        )
+    cur.execute(
+        """
+        INSERT INTO records
+        (track, session_type, best_lap_ms, player_id, first_name, last_name, short_name, car_model, race_number, cup_category, set_session_id, set_at_utc)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(track, session_type) DO UPDATE SET
+          best_lap_ms     = excluded.best_lap_ms,
+          player_id       = excluded.player_id,
+          first_name      = excluded.first_name,
+          last_name       = excluded.last_name,
+          short_name      = excluded.short_name,
+          car_model       = excluded.car_model,
+          race_number     = excluded.race_number,
+          cup_category    = excluded.cup_category,
+          set_session_id  = excluded.set_session_id,
+          set_at_utc      = excluded.set_at_utc
+        """,
+        (track, stype, best_lap_ms, player_id, first_name, last_name, short_name, car_model, race_number, cup_category, session_id, file_mtime_utc)
+    )
 
         # Track record announcement
-        cur.execute(
-            """
-            INSERT OR IGNORE INTO record_announcements
+    cur.execute(
+        """
+        INSERT OR IGNORE INTO record_announcements
             (track, session_type, best_lap_ms, announced_at_utc, discord_message_id, announcement_type)
             VALUES (?, ?, ?, ?, NULL, 'TR')
-            """,
-            (track, stype, best_lap_ms, file_mtime_utc)
+        """,
+        (track, stype, best_lap_ms, file_mtime_utc)
         )
     
     # Check for personal bests for ALL drivers in this session
@@ -214,6 +214,14 @@ def main():
             FOREIGN KEY(session_id) REFERENCES sessions(session_id)
         )
     """)
+    
+    # Add best_splits_json column if it doesn't exist
+    try:
+        cur.execute("ALTER TABLE entries ADD COLUMN best_splits_json TEXT")
+        con.commit()
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+    
     con.commit()
 
     files = [f for f in os.listdir(RESULTS_DIR) if f.upper().endswith(".JSON")]
@@ -239,7 +247,7 @@ def main():
             skipped_dupe += 1
             continue
 
-        # Load JSON
+       # Load JSON
         try:
             with open(full_path, "r", encoding="utf-16le") as f:
                 data = json.load(f)
@@ -255,65 +263,75 @@ def main():
             skipped_empty += 1
             continue
 
-        track = data.get("trackName") or ""
-        server_name = data.get("serverName")
-        is_wet = ((data.get("sessionResult") or {}).get("isWetSession"))
-        session_index = data.get("sessionIndex")
-        race_weekend_index = data.get("raceWeekendIndex")
+            track = data.get("trackName") or ""
+            server_name = data.get("serverName")
+            is_wet = ((data.get("sessionResult") or {}).get("isWetSession"))
+            session_index = data.get("sessionIndex")
+            race_weekend_index = data.get("raceWeekendIndex")
 
         file_mtime_utc = datetime.fromtimestamp(os.path.getmtime(full_path), timezone.utc).isoformat()
 
-        # Insert session
-        cur.execute(
-            """
-            INSERT INTO sessions
-            (source_file, session_type, track, server_name, is_wet, session_index, race_weekend_index, file_mtime_utc)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (full_path, stype, track, server_name, is_wet, session_index, race_weekend_index, file_mtime_utc),
-        )
-        session_id = cur.lastrowid
-
-        # Insert entries from leaderboard lines
-        for idx, line in enumerate(leader):
-            car = (line.get("car") or {})
-            timing = (line.get("timing") or {})
-            driver = (line.get("currentDriver") or {})
-
-            best_lap_ms = norm_time_ms(timing.get("bestLap"))
-            total_time_ms = norm_time_ms(timing.get("totalTime"))
-
+            # Insert session
             cur.execute(
                 """
-                INSERT INTO entries
-                (session_id, position, car_id, race_number, car_model, cup_category, car_group,
-                player_id, first_name, last_name, short_name,
-                best_lap_ms, total_time_ms, lap_count, missing_mandatory_pitstop)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO sessions
+                (source_file, session_type, track, server_name, is_wet, session_index, race_weekend_index, file_mtime_utc)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (
-                    session_id,
-                    idx + 1,
-                    car.get("carId"),
-                    car.get("raceNumber"),
-                    car.get("carModel"),
-                    car.get("cupCategory"),
-                    car.get("carGroup"),
-                    driver.get("playerId"),
-                    driver.get("firstName"),
-                    driver.get("lastName"),
-                    driver.get("shortName"),
-                    best_lap_ms,
-                    total_time_ms,
-                    timing.get("lapCount"),
-                    line.get("missingMandatoryPitstop"),
-                ),
+                (full_path, stype, track, server_name, is_wet, session_index, race_weekend_index, file_mtime_utc),
             )
-            
-        maybe_update_records(cur, session_id)
+            session_id = cur.lastrowid
+
+            # Insert entries from leaderboard lines
+            for idx, line in enumerate(leader):
+                car = (line.get("car") or {})
+                timing = (line.get("timing") or {})
+                driver = (line.get("currentDriver") or {})
+
+                best_lap_ms = norm_time_ms(timing.get("bestLap"))
+                total_time_ms = norm_time_ms(timing.get("totalTime"))
+                
+                # Store bestSplits as JSON string (variable number of sectors)
+                best_splits = timing.get("bestSplits")
+                best_splits_json = None
+                if best_splits and isinstance(best_splits, list):
+                    # Filter out invalid sentinel values
+                    valid_splits = [s for s in best_splits if s not in SENTINEL_TIMES]
+                    if valid_splits:
+                        best_splits_json = json.dumps(valid_splits)
+
+                cur.execute(
+                    """
+                    INSERT INTO entries
+                    (session_id, position, car_id, race_number, car_model, cup_category, car_group,
+                    player_id, first_name, last_name, short_name,
+                    best_lap_ms, total_time_ms, lap_count, missing_mandatory_pitstop, best_splits_json)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        session_id,
+                        idx + 1,
+                        car.get("carId"),
+                        car.get("raceNumber"),
+                        car.get("carModel"),
+                        car.get("cupCategory"),
+                        car.get("carGroup"),
+                        driver.get("playerId"),
+                        driver.get("firstName"),
+                        driver.get("lastName"),
+                        driver.get("shortName"),
+                        best_lap_ms,
+                        total_time_ms,
+                        timing.get("lapCount"),
+                        line.get("missingMandatoryPitstop"),
+                        best_splits_json,
+                    ),
+                )
+                
+            maybe_update_records(cur, session_id)
         queue_race_results(cur, session_id)
-        imported += 1
-        con.commit()
+            imported += 1
+            con.commit()
 
     print("Done.")
     print(f"Imported sessions: {imported}")
