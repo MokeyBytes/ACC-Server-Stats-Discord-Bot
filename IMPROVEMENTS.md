@@ -3,6 +3,41 @@
 ## 🎯 Overview
 Based on GT racing statistics research and sim racing community preferences, here are comprehensive improvements to make the bot more informative and visually appealing.
 
+## 📋 **DATA AVAILABILITY REFERENCE**
+
+### ✅ **Available in JSON File:**
+- ✅ **Sector Times**: `bestSplits` array [S1, S2, S3] in milliseconds (in `sessionResult` and `leaderBoardLines[].timing`)
+- ✅ **Lap Times**: `laps[]` array with `laptime`, `splits`, `isValidForBest`, `carId`, `driverIndex`
+- ✅ **Best Lap**: `bestLap` and `bestSplits` per driver in `leaderBoardLines[]`
+- ✅ **Total Race Time**: `totalTime` per driver
+- ✅ **Lap Count**: `lapCount` per driver
+- ✅ **Final Position**: Order of entries in `leaderBoardLines[]` array
+- ✅ **Car Info**: `carModel`, `carId`, `raceNumber`, `carGroup`, `cupCategory`
+- ✅ **Driver Info**: `firstName`, `lastName`, `shortName`, `playerId`
+- ✅ **Weather**: `isWetSession` (0 = dry, 1 = wet)
+- ✅ **Track Name**: `trackName`
+- ✅ **Server Name**: `serverName`
+- ✅ **Session Info**: `sessionType`, `sessionIndex`, `raceWeekendIndex`
+- ✅ **Penalties**: `penalties[]` and `post_race_penalties[]` arrays
+- ✅ **Pit Stop Flag**: `missingMandatoryPitstop` (boolean per driver)
+
+### ❌ **NOT Available in JSON:**
+- ❌ Position changes (no qualifying grid position or per-lap position tracking)
+- ❌ Laps led (no position history per lap)
+- ❌ Pit stop details (only boolean flag, no timing/lap info)
+- ❌ Retirements/DNFs (not explicitly tracked)
+- ❌ Historical data (only current session)
+- ❌ Qualifying vs Race comparison (one session type per file)
+
+### ⚠️ **Requires Database Aggregation:**
+- ⚠️ Comparison across multiple sessions
+- ⚠️ Trends over time
+- ⚠️ Consistency metrics (requires multiple sessions per driver)
+- ⚠️ Win rates, podiums, head-to-head records
+- ⚠️ Track records history (comparing across sessions)
+
+**Note**: All improvements marked with ✅ are immediately implementable. Items marked with ⚠️ require DB queries across multiple sessions. Items marked with ❌ should be skipped or require custom implementation.
+
 ---
 
 ## 📊 **1. EMBED VISUAL IMPROVEMENTS**
@@ -43,11 +78,11 @@ color=discord.Color.green()
 ```python
 # Instead of: "🏆 New Track Record!"
 # Use: "🏆 NEW TRACK RECORD! 🏆"
-# Add subtitle: "Smashed the previous record by X.XXXs!"
+# Add subtitle (if previous record exists in DB): "Smashed the previous record by X.XXXs!"
 
 # Instead of: "🎯 New Personal Best!"
 # Use: "🎯 PERSONAL BEST ACHIEVED! 🎯"  
-# Add subtitle: "Moved up X positions on the leaderboard!"
+# Add subtitle (if rank data available in DB): "Moved up X positions on the leaderboard!"
 ```
 
 ---
@@ -77,9 +112,10 @@ embed.add_field(
     inline=False
 )
 
-# PB embed show:
+# PB embed show (if track record exists in DB):
 "S1: +0.123 vs record | S2: -0.045 vs record | S3: +0.089 vs record"
 "🏆 Strongest: S2 | 💪 Weakest: S1"
+# Note: Sector data available in JSON: bestSplits array [S1, S2, S3] in milliseconds
 ```
 
 ---
@@ -93,18 +129,20 @@ embed.add_field(
 
 ### Implementation Plan:
 
-#### **A. Add to `/pb` Command**
+#### **A. Add to `/pb` Command** (requires DB with multiple sessions)
 ```python
-# Show consistency rating:
+# Show consistency rating (calculated from multiple sessions in DB):
 "📊 Consistency: 95.2% (0.234s variance)"
 "📈 Average Lap: 1:42.567 (vs Best: 1:42.123)"
+# Note: Requires aggregating data from multiple sessions stored in DB
 ```
 
-#### **B. Add to Race Results**
+#### **B. Add to Race Results** (✅ Available in JSON)
 ```python
-# Show lap progression for top drivers:
+# Show lap progression for top drivers (from laps array in JSON):
 "Lap Times: 1:42.1 | 1:42.3 | 1:42.0 | 1:43.2 | 1:41.9 🔥"
 "Best 5-lap avg: 1:42.15"
+# Data available: laps[] array with carId, laptime, isValidForBest, splits
 ```
 
 ---
@@ -114,40 +152,41 @@ embed.add_field(
 ### Current: Basic standings with gap and best lap
 ### Suggested Additions:
 
-#### **A. Position Changes**
+#### **A. Position Changes** ❌ NOT AVAILABLE
 ```python
-# Show position gained/lost:
-"P3 → P1 (+2 positions) 🚀"
-"P1 → P2 (-1 position) 📉"
-
-# Biggest movers:
-"🏆 Biggest Gainer: Driver Name (+5 positions)"
+# Position changes require qualifying grid positions or position history per lap
+# NOT available in single JSON file - would need to compare with qualifying session
+# Skip this feature or implement via DB comparison with previous sessions
 ```
 
-#### **B. Laps Led**
+#### **B. Laps Led** ❌ NOT AVAILABLE
 ```python
-# Track and display:
-"Led 12/20 laps (60%)"
+# Laps led requires position tracking per lap
+# NOT available in JSON - only final positions in leaderBoardLines
+# Skip this feature
 ```
 
-#### **C. Fastest Lap Indicator**
+#### **C. Fastest Lap Indicator** ✅ ENHANCED (Available)
 ```python
-# Already have this, but enhance:
-"⚡ Fastest Lap: 1:42.123 (Lap 8) — Driver Name"
-"🏆 FL Bonus: +1 point"  # If using points system
+# Already have this, but enhance with lap number:
+"⚡ Fastest Lap: 1:42.123 — Driver Name"
+# Note: Can find which lap from laps[] array by matching bestLap time
+# Could show: "⚡ Fastest Lap: 1:42.123 (from laps array) — Driver Name"
 ```
 
-#### **D. Retirements/DNFs**
+#### **D. Retirements/DNFs** ❌ NOT EXPLICITLY TRACKED
 ```python
-# Show drivers who didn't finish:
-"DNF: Driver Name (Lap 15/20) - Mechanical"
+# Retirements not explicitly tracked - all entries have lapCount matching total
+# Could infer if lapCount < expected, but not reliable
+# Skip this feature or mark as "incomplete" if lapCount significantly low
 ```
 
-#### **E. Pit Stop Strategy**
+#### **E. Pit Stop Strategy** ❌ NOT AVAILABLE
 ```python
-# If available in JSON:
-"Pit Stops: 1 (Lap 10, 25.3s)"
-"Strategy: 1-stop"
+# Pit stop data not in JSON
+# Only available: missingMandatoryPitstop (boolean flag)
+# Skip detailed pit stop info, but could show:
+"Pit Stop Status: ✅ Mandatory pit stop completed"
 ```
 
 ---
@@ -180,48 +219,50 @@ embed.add_field(
 
 ## 🎮 **6. NEW COMMANDS**
 
-### A. `/compare <player1> <player2> [track]`
-Compare two drivers side-by-side:
+### A. `/compare <player1> <player2> [track]` (requires DB)
+Compare two drivers side-by-side using stored session data:
 ```
 Driver A vs Driver B @ Barcelona:
 🏁 Qualifying: 1:42.1 vs 1:42.5 (-0.4s) ✅ Driver A
 🏎️ Race: 1:42.3 vs 1:42.8 (-0.5s) ✅ Driver A
 📊 Overall: Driver A leads 8-3 head-to-head
+# Note: Requires querying DB for both players' times across sessions
 ```
 
-### B. `/trends <player>`
-Show performance trends over time:
+### B. `/trends <player>` (requires DB with historical data)
+Show performance trends over time from stored sessions:
 ```
 📈 Performance Trends: Driver Name
 Last 5 Races: ↑↑↑↑↑ (Improving!)
 Best Improvement: Barcelona (-0.523s)
 Favorite Track: Spa-Francorchamps (5 wins)
+# Note: Requires DB with multiple sessions per driver
 ```
 
-### C. `/session <session_id>` or `/latest`
-Show detailed breakdown of latest session:
-- All lap times
-- Sector analysis
-- Position graph
-- Fastest sectors
+### C. `/session <session_id>` or `/latest` ✅ AVAILABLE
+Show detailed breakdown of latest session using JSON data:
+- All lap times (✅ from laps[] array)
+- Sector analysis (✅ from bestSplits and lap splits)
+- Lap-by-lap breakdown (✅ from laps[] array)
+- Fastest sectors (✅ calculate from splits data)
+# Note: Position graph not available - no per-lap position tracking
 
-### D. `/carstats <car_model>`
-Show statistics for a specific car:
+### D. `/carstats <car_model>` (requires DB aggregation)
+Show statistics for a specific car from stored sessions:
 ```
 BMW M4 GT3 Stats:
 🏆 Tracks: 15 tracks driven
 📊 Best Track: Spa (1:41.234 avg)
 👥 Drivers: 12 unique drivers
-📈 Win Rate: 23.5%
+📈 Win Rate: 23.5% (calculated from position = 1 in entries)
+# Note: Requires aggregating data across all sessions in DB
 ```
 
-### E. `/season` or `/championship`
-Season-long standings (if tracking):
+### E. `/season` or `/championship` ❌ NOT AVAILABLE
 ```
-🏆 Season Standings:
-1. Driver A - 245 pts (8 wins)
-2. Driver B - 198 pts (5 wins)
-...
+# Season/championship tracking requires points system and race weekend tracking
+# NOT available in JSON - would need custom implementation
+# Skip unless implementing custom points/championship system in DB
 ```
 
 ---
@@ -263,24 +304,24 @@ embed.set_footer(
 
 ## 📊 **8. DATA RICHNESS**
 
-### A. Add to `/records` Command
+### A. Add to `/records` Command (requires DB)
 ```python
-# Show more context:
-- Number of attempts at this track
-- Average time of top 10
-- Time since record was set
-- Previous record holder
-- Improvement margin
+# Show more context (all require DB queries):
+- Number of attempts at this track (COUNT sessions from DB)
+- Average time of top 10 (aggregate from entries in DB)
+- Time since record was set (from records.set_at_utc)
+- Previous record holder (query records history if stored)
+- Improvement margin (compare with previous record if available)
 ```
 
-### B. Add to `/pb` Command
+### B. Add to `/pb` Command (requires DB aggregation)
 ```python
-# Enhanced statistics:
-- Win rate at this track
-- Average finish position
-- Best vs Worst lap spread
-- Number of podiums
-- Head-to-head record vs other drivers
+# Enhanced statistics (require DB with multiple sessions):
+- Win rate at this track (COUNT position=1 / total races from DB)
+- Average finish position (AVG position from entries in DB)
+- Best vs Worst lap spread (MIN/MAX best_lap_ms from entries in DB)
+- Number of podiums (COUNT position <= 3 from entries in DB)
+- Head-to-head record vs other drivers (compare times across sessions in DB)
 ```
 
 ### C. Add to `/leaders` Command
@@ -340,25 +381,28 @@ embed.set_footer(
 
 ## 🎯 **11. COMPETITIVE FEATURES**
 
-### A. Rivalries
+### A. Rivalries (requires DB)
 ```python
-# Track close competitors:
+# Track close competitors (requires DB aggregation):
 "🔥 Rival: Driver X (0.023s faster on average)"
 "⚔️ Head-to-Head: 5-3 in your favor"
+# Note: Requires comparing times across multiple sessions in DB
 ```
 
-### B. Challenges
+### B. Challenges (requires DB)
 ```python
-# Suggest targets:
+# Suggest targets (requires DB query):
 "🎯 Challenge: Beat Driver X's time at Barcelona (1:42.567)"
 "📊 You're 0.234s away!"
+# Note: Requires querying DB for other driver's PB at track
 ```
 
-### C. Leaderboard Positions
+### C. Leaderboard Positions (requires DB)
 ```python
-# Show movement:
+# Show movement (requires DB rank calculation):
 "📊 Leaderboard: #5 → #3 (+2) 🚀"
 "Goal: #1 (0.456s away)"
+# Note: Requires calculating rank from DB and comparing over time
 ```
 
 ---
@@ -436,16 +480,16 @@ CREATE INDEX idx_records_track_type ON records(track, session_type);
 4. ✅ Footer enhancements
 
 ### **Phase 2: Data Display (Medium Effort)**
-5. ✅ Sector times display (if available in JSON)
-6. ✅ Position changes in race results
-7. ✅ Consistency metrics in /pb
-8. ✅ Car performance stats
+5. ✅ Sector times display (✅ Available in JSON: bestSplits array)
+6. ❌ Position changes in race results (NOT available - skip)
+7. ⚠️ Consistency metrics in /pb (requires DB aggregation)
+8. ⚠️ Car performance stats (requires DB aggregation)
 
 ### **Phase 3: New Features (Higher Effort)**
-9. ✅ New commands (/compare, /trends, /carstats)
-10. ✅ Sector times storage in DB
-11. ✅ Achievement system
-12. ✅ Championship/season tracking
+9. ⚠️ New commands (/compare, /trends, /carstats) - all require DB
+10. ✅ Sector times storage in DB (data available in JSON)
+11. ⚠️ Achievement system (requires DB aggregation)
+12. ❌ Championship/season tracking (NOT available - skip)
 
 ---
 
