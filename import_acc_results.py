@@ -70,34 +70,34 @@ def maybe_update_records(cur, session_id: int):
 
     # Track record handling
     if is_new_record:
-    cur.execute(
-        """
-        INSERT INTO records
-        (track, session_type, best_lap_ms, player_id, first_name, last_name, short_name, car_model, race_number, cup_category, set_session_id, set_at_utc)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(track, session_type) DO UPDATE SET
-          best_lap_ms     = excluded.best_lap_ms,
-          player_id       = excluded.player_id,
-          first_name      = excluded.first_name,
-          last_name       = excluded.last_name,
-          short_name      = excluded.short_name,
-          car_model       = excluded.car_model,
-          race_number     = excluded.race_number,
-          cup_category    = excluded.cup_category,
-          set_session_id  = excluded.set_session_id,
-          set_at_utc      = excluded.set_at_utc
-        """,
-        (track, stype, best_lap_ms, player_id, first_name, last_name, short_name, car_model, race_number, cup_category, session_id, file_mtime_utc)
-    )
+        cur.execute(
+            """
+            INSERT INTO records
+            (track, session_type, best_lap_ms, player_id, first_name, last_name, short_name, car_model, race_number, cup_category, set_session_id, set_at_utc)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(track, session_type) DO UPDATE SET
+              best_lap_ms     = excluded.best_lap_ms,
+              player_id       = excluded.player_id,
+              first_name      = excluded.first_name,
+              last_name       = excluded.last_name,
+              short_name      = excluded.short_name,
+              car_model       = excluded.car_model,
+              race_number     = excluded.race_number,
+              cup_category    = excluded.cup_category,
+              set_session_id  = excluded.set_session_id,
+              set_at_utc      = excluded.set_at_utc
+            """,
+            (track, stype, best_lap_ms, player_id, first_name, last_name, short_name, car_model, race_number, cup_category, session_id, file_mtime_utc)
+        )
 
         # Track record announcement
-    cur.execute(
-        """
-        INSERT OR IGNORE INTO record_announcements
+        cur.execute(
+            """
+            INSERT OR IGNORE INTO record_announcements
             (track, session_type, best_lap_ms, announced_at_utc, discord_message_id, announcement_type)
             VALUES (?, ?, ?, ?, NULL, 'TR')
-        """,
-        (track, stype, best_lap_ms, file_mtime_utc)
+            """,
+            (track, stype, best_lap_ms, file_mtime_utc)
         )
     
     # Check for personal bests for ALL drivers in this session
