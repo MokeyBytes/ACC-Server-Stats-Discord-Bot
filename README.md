@@ -160,7 +160,22 @@ Posted automatically after each race:
 pip install discord.py pytz
 ```
 
-### 2. Set Discord Bot Token
+### 2. Create Discord Bot
+
+You need to create a Discord bot application and get a bot token.
+
+1. Go to the [Discord Developer Portal](https://discord.com/developers/applications)
+2. Create a new application
+3. Navigate to the "Bot" section
+4. Create a bot and copy the token
+5. Invite the bot to your server with the following permissions:
+   - **Send Messages**
+   - **Embed Links**
+   - **Attach Files**
+   - **Read Message History**
+   - **Use Slash Commands**
+
+### 3. Set Discord Bot Token
 ```powershell
 # Temporary (current session only)
 $env:DISCORD_TOKEN = "your_token_here"
@@ -169,7 +184,7 @@ $env:DISCORD_TOKEN = "your_token_here"
 [Environment]::SetEnvironmentVariable("DISCORD_TOKEN", "your_token_here", "User")
 ```
 
-### 3. Configure ACC Server
+### 4. Configure ACC Server
 
 **Important:** The ACC server must be configured to dump leaderboard data.
 
@@ -183,7 +198,7 @@ In your ACC server's configuration file `server/cfg/settings.json`, ensure:
 
 This setting enables the server to generate the JSON result files that the bot imports. Without this, no race data will be available.
 
-### 4. Configure Paths
+### 5. Configure Paths
 Edit `config.py`:
 ```python
 DB_PATH = r"C:\accserver\stats\acc_stats.sqlite"  # Your database path
@@ -191,12 +206,12 @@ CHANNEL_ID = 123456789012345678                    # Your Discord channel ID
 IMG_DIR = r"C:\accserver\stats\img"               # Track images folder
 ```
 
-### 5. Run the Bot
+### 6. Run the Bot
 ```bash
 py run_bot.py
 ```
 
-### 6. Run File Watcher (Separate Terminal)
+### 7. Run File Watcher (Separate Terminal)
 ```powershell
 .\watch_results.ps1
 ```
