@@ -45,8 +45,8 @@ def setup_records_command(tree: app_commands.CommandTree):
             )
             return
         
-        # Get top 4 times for both Q and R (leader + next 3)
-        q_times, r_times = fetch_track_top_times(con, actual_track, limit=4)
+        # Get top 3 times for both Q and R
+        q_times, r_times = fetch_track_top_times(con, actual_track, limit=3)
         con.close()
 
         if not q_times and not r_times:
@@ -76,39 +76,29 @@ def setup_records_command(tree: app_commands.CommandTree):
         
         # Qualifying section
         if q_times:
-            leader_q = q_times[0]
-            stype, leader_ms, first, last, short, car_model, set_at_utc = leader_q
-            who = format_driver(first, last, short)
-            when = fmt_dt(set_at_utc) if set_at_utc else "Unknown time"
-            car_name = fmt_car_model(car_model)
+            leader_ms = q_times[0][1]  # Best time from first entry
+            medals = {1: "🥇", 2: "🥈", 3: "🥉"}
+            times_list = []
             
-            # Highlight leader
-            q_leader_text = f"🥇 **{fmt_ms(leader_ms)}** — {who}\n`{car_name}` • {when}"
-            embed.add_field(
-                name="🏁 Qualifying Leader",
-                value=q_leader_text,
-                inline=False
-            )
-            
-            # Next 3 times with splits
-            if len(q_times) > 1:
-                next_times = []
-                medals = {1: "🥇", 2: "🥈", 3: "🥉"}
-                for idx, (stype, best_ms, first, last, short, car_model, set_at_utc) in enumerate(q_times[1:4], 2):
-                    who = format_driver(first, last, short)
-                    when = fmt_dt(set_at_utc) if set_at_utc else "Unknown time"
-                    car_name = fmt_car_model(car_model)
+            for idx, (stype, best_ms, first, last, short, car_model, set_at_utc) in enumerate(q_times[:3], 1):
+                who = format_driver(first, last, short)
+                car_name = fmt_car_model(car_model)
+                medal = medals.get(idx, "")
+                
+                if idx == 1:
+                    # First place - no split needed
+                    times_list.append(f"{medal} **{fmt_ms(best_ms)}** — {who} ({car_name})")
+                else:
+                    # Calculate gap to leader
                     split_ms = best_ms - leader_ms  # Positive = slower
                     split_str = fmt_split_ms(split_ms)
-                    medal = medals.get(idx, "")
-                    next_times.append(f"{medal} **{idx}.** **{fmt_ms(best_ms)}** ({split_str}) — {who} ({car_name})")
-                
-                if next_times:
-                    embed.add_field(
-                        name="🏁 Qualifying Times",
-                        value="\n".join(next_times),
-                        inline=False
-                    )
+                    times_list.append(f"{medal} **{fmt_ms(best_ms)}** ({split_str}) — {who} ({car_name})")
+            
+            embed.add_field(
+                name="🏁 Qualifying",
+                value="\n".join(times_list),
+                inline=False
+            )
         else:
             embed.add_field(
                 name="🏁 Qualifying",
@@ -118,39 +108,29 @@ def setup_records_command(tree: app_commands.CommandTree):
         
         # Race section
         if r_times:
-            leader_r = r_times[0]
-            stype, leader_ms, first, last, short, car_model, set_at_utc = leader_r
-            who = format_driver(first, last, short)
-            when = fmt_dt(set_at_utc) if set_at_utc else "Unknown time"
-            car_name = fmt_car_model(car_model)
+            leader_ms = r_times[0][1]  # Best time from first entry
+            medals = {1: "🥇", 2: "🥈", 3: "🥉"}
+            times_list = []
             
-            # Highlight leader
-            r_leader_text = f"🥇 **{fmt_ms(leader_ms)}** — {who}\n`{car_name}` • {when}"
-            embed.add_field(
-                name="🏎️ Race Leader",
-                value=r_leader_text,
-                inline=False
-            )
-            
-            # Next 3 times with splits
-            if len(r_times) > 1:
-                next_times = []
-                medals = {1: "🥇", 2: "🥈", 3: "🥉"}
-                for idx, (stype, best_ms, first, last, short, car_model, set_at_utc) in enumerate(r_times[1:4], 2):
-                    who = format_driver(first, last, short)
-                    when = fmt_dt(set_at_utc) if set_at_utc else "Unknown time"
-                    car_name = fmt_car_model(car_model)
+            for idx, (stype, best_ms, first, last, short, car_model, set_at_utc) in enumerate(r_times[:3], 1):
+                who = format_driver(first, last, short)
+                car_name = fmt_car_model(car_model)
+                medal = medals.get(idx, "")
+                
+                if idx == 1:
+                    # First place - no split needed
+                    times_list.append(f"{medal} **{fmt_ms(best_ms)}** — {who} ({car_name})")
+                else:
+                    # Calculate gap to leader
                     split_ms = best_ms - leader_ms  # Positive = slower
                     split_str = fmt_split_ms(split_ms)
-                    medal = medals.get(idx, "")
-                    next_times.append(f"{medal} **{idx}.** **{fmt_ms(best_ms)}** ({split_str}) — {who} ({car_name})")
-                
-                if next_times:
-                    embed.add_field(
-                        name="🏎️ Race Times",
-                        value="\n".join(next_times),
-                        inline=False
-                    )
+                    times_list.append(f"{medal} **{fmt_ms(best_ms)}** ({split_str}) — {who} ({car_name})")
+            
+            embed.add_field(
+                name="🏎️ Race",
+                value="\n".join(times_list),
+                inline=False
+            )
         else:
             embed.add_field(
                 name="🏎️ Race",
