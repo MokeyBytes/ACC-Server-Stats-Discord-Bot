@@ -18,7 +18,7 @@ def build_track_record_embed(track, stype, best_ms, when_utc, first, last, short
     car_name = fmt_car_model(car_model)
     
     embed = discord.Embed(
-        title=f"🏆 New Track Record!",
+        title=f"🏆 NEW TRACK RECORD! 🏆",
         description=f"**{track}** - {session_label}",
         color=discord.Color.gold(),
         timestamp=datetime.now(timezone.utc)
@@ -69,7 +69,7 @@ def build_personal_best_embed(track, stype, best_ms, when_utc, first, last, shor
     car_name = fmt_car_model(car_model)
     
     embed = discord.Embed(
-        title=f"🎯 New Personal Best!",
+        title=f"🎯 PERSONAL BEST ACHIEVED! 🎯",
         description=f"**{track}** - {session_label}",
         color=discord.Color.green(),
         timestamp=datetime.now(timezone.utc)
@@ -118,10 +118,14 @@ def build_race_results_embed(track, session_data, entries, when_utc):
     # Get lap count from first entry (should be same for all finishers)
     lap_count = entries[0][8] if entries and len(entries[0]) > 8 else 0
     
+    # Determine embed color based on race completion
+    # Use a vibrant blue for race results (can be enhanced with position-based accents in text)
+    race_color = discord.Color.blue()
+    
     # Create embed
     embed = discord.Embed(
         title=f"🏁 Race Results - {track.title().replace('_', ' ')}",
-        color=discord.Color.blue(),
+        color=race_color,
         timestamp=datetime.now(timezone.utc)
     )
     
