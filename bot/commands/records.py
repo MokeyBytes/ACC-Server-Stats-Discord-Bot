@@ -105,7 +105,7 @@ def setup_records_command(tree: app_commands.CommandTree):
                 
                 if next_times:
                     embed.add_field(
-                        name="Qualifying Times",
+                        name="🏁 Qualifying Times",
                         value="\n".join(next_times),
                         inline=False
                     )
@@ -147,7 +147,7 @@ def setup_records_command(tree: app_commands.CommandTree):
                 
                 if next_times:
                     embed.add_field(
-                        name="Race Times",
+                        name="🏎️ Race Times",
                         value="\n".join(next_times),
                         inline=False
                     )

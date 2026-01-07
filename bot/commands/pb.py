@@ -133,14 +133,14 @@ def setup_pb_command(tree: app_commands.CommandTree):
                     sessions_text = f"{q_data['session_count']} session" + ("s" if q_data['session_count'] > 1 else "")
                     line_parts.append(f"({sessions_text})")
                 
-                # Trend indicator
+                # Trend indicator - use 📈📉 for better visual clarity
                 if q_data['trend']:
                     if q_data['trend'] == "faster":
-                        trend_emoji = "⬇️"
+                        trend_emoji = "📈"  # Improving (faster time = lower)
                     elif q_data['trend'] == "slower":
-                        trend_emoji = "⬆️"
+                        trend_emoji = "📉"  # Declining (slower time = higher)
                     else:
-                        trend_emoji = "➡️"
+                        trend_emoji = "➡️"  # Equal
                     line_parts.append(trend_emoji)
                 
                 track_text.append(" ".join(line_parts))
@@ -182,14 +182,14 @@ def setup_pb_command(tree: app_commands.CommandTree):
                     sessions_text = f"{r_data['session_count']} session" + ("s" if r_data['session_count'] > 1 else "")
                     line_parts.append(f"({sessions_text})")
                 
-                # Trend indicator
+                # Trend indicator - use 📈📉 for better visual clarity
                 if r_data['trend']:
                     if r_data['trend'] == "faster":
-                        trend_emoji = "⬇️"
+                        trend_emoji = "📈"  # Improving (faster time = lower)
                     elif r_data['trend'] == "slower":
-                        trend_emoji = "⬆️"
+                        trend_emoji = "📉"  # Declining (slower time = higher)
                     else:
-                        trend_emoji = "➡️"
+                        trend_emoji = "➡️"  # Equal
                     line_parts.append(trend_emoji)
                 
                 track_text.append(" ".join(line_parts))

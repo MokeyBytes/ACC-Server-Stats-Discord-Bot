@@ -17,15 +17,18 @@ def build_track_record_embed(track, stype, best_ms, when_utc, first, last, short
 
     car_name = fmt_car_model(car_model)
     
+    # Add session type emoji
+    session_emoji = "🏁" if stype == "Q" else "🏎️"
+    
     embed = discord.Embed(
         title=f"🏆 NEW TRACK RECORD! 🏆",
-        description=f"**{track}** - {session_label}",
+        description=f"{session_emoji} **{track}** - {session_label}",
         color=discord.Color.gold(),
         timestamp=datetime.now(timezone.utc)
     )
     
     embed.add_field(
-        name="🏁 Driver",
+        name="👤 Driver",
         value=who,
         inline=True
     )
@@ -68,15 +71,18 @@ def build_personal_best_embed(track, stype, best_ms, when_utc, first, last, shor
 
     car_name = fmt_car_model(car_model)
     
+    # Add session type emoji
+    session_emoji = "🏁" if stype == "Q" else "🏎️"
+    
     embed = discord.Embed(
         title=f"🎯 PERSONAL BEST ACHIEVED! 🎯",
-        description=f"**{track}** - {session_label}",
+        description=f"{session_emoji} **{track}** - {session_label}",
         color=discord.Color.green(),
         timestamp=datetime.now(timezone.utc)
     )
     
     embed.add_field(
-        name="🏁 Driver",
+        name="👤 Driver",
         value=who,
         inline=True
     )
@@ -170,9 +176,12 @@ def build_race_results_embed(track, session_data, entries, when_utc):
         else:
             gap_str = "N/A"
         
-        # Best lap comparison
+        # Best lap comparison - add 🔥 for leader's best lap
         if best_lap_ms and leader_best_ms:
             if position == 1:
+                best_lap_str = f"**{fmt_ms(best_lap_ms)}** 🔥"
+            elif best_lap_ms == leader_best_ms:
+                # If tied for fastest lap but not leader, also show 🔥
                 best_lap_str = f"**{fmt_ms(best_lap_ms)}** 🔥"
             else:
                 lap_diff = best_lap_ms - leader_best_ms
