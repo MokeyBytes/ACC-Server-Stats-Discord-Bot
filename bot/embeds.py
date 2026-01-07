@@ -6,7 +6,7 @@ from utils.formatting import fmt_ms, fmt_dt, fmt_split_ms, fmt_car_model
 from utils.images import find_track_image
 
 
-def build_track_record_embed(track, stype, best_ms, when_utc, first, last, short, car_model):
+def build_track_record_embed(track, stype, best_ms, when_utc, first, last, short, car_model, previous_record_ms=None):
     """Build a Discord embed for track record announcements."""
     session_label = "Qualifying" if stype == "Q" else "Race"
     who = "Unknown driver"
@@ -20,9 +20,16 @@ def build_track_record_embed(track, stype, best_ms, when_utc, first, last, short
     # Add session type emoji
     session_emoji = "🏁" if stype == "Q" else "🏎️"
     
+    # Build description with optional improvement subtitle
+    description = f"{session_emoji} **{track}** - {session_label}"
+    if previous_record_ms is not None:
+        improvement_ms = previous_record_ms - best_ms
+        improvement_str = fmt_split_ms(improvement_ms)
+        description += f"\n**🔥 Smashed the previous record by {improvement_str}!**"
+    
     embed = discord.Embed(
         title=f"🏆 NEW TRACK RECORD! 🏆",
-        description=f"{session_emoji} **{track}** - {session_label}",
+        description=description,
         color=discord.Color.gold(),
         timestamp=datetime.now(timezone.utc)
     )
@@ -60,7 +67,7 @@ def build_track_record_embed(track, stype, best_ms, when_utc, first, last, short
     return embed, None
 
 
-def build_personal_best_embed(track, stype, best_ms, when_utc, first, last, short, car_model):
+def build_personal_best_embed(track, stype, best_ms, when_utc, first, last, short, car_model, previous_rank=None, current_rank=None):
     """Build a Discord embed for personal best announcements."""
     session_label = "Qualifying" if stype == "Q" else "Race"
     who = "Unknown driver"
@@ -74,9 +81,18 @@ def build_personal_best_embed(track, stype, best_ms, when_utc, first, last, shor
     # Add session type emoji
     session_emoji = "🏁" if stype == "Q" else "🏎️"
     
+    # Build description with optional rank change subtitle
+    description = f"{session_emoji} **{track}** - {session_label}"
+    if previous_rank is not None and current_rank is not None and previous_rank > current_rank:
+        positions_gained = previous_rank - current_rank
+        description += f"\n**🚀 Moved up {positions_gained} position{'s' if positions_gained > 1 else ''} on the leaderboard!**"
+    elif previous_rank is None and current_rank is not None:
+        # First time on this track
+        description += f"\n**✨ First time on this track - Rank #{current_rank}!**"
+    
     embed = discord.Embed(
         title=f"🎯 PERSONAL BEST ACHIEVED! 🎯",
-        description=f"{session_emoji} **{track}** - {session_label}",
+        description=description,
         color=discord.Color.green(),
         timestamp=datetime.now(timezone.utc)
     )

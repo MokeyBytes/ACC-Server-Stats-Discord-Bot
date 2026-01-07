@@ -7,7 +7,8 @@ from discord import app_commands
 from config import DB_PATH, CHANNEL_ID, POLL_SECONDS
 from db.queries import (
     fetch_queue, mark_sent, fetch_race_results_queue, 
-    fetch_race_session_data, mark_race_results_sent
+    fetch_race_session_data, mark_race_results_sent,
+    get_previous_track_record, get_player_rank, get_player_previous_rank
 )
 from bot.embeds import build_track_record_embed, build_personal_best_embed, build_race_results_embed
 from bot.commands.records import setup_records_command
@@ -59,9 +60,22 @@ def create_bot() -> tuple[discord.Client, app_commands.CommandTree]:
                 ) in rows:
                     # Build embed based on announcement type
                     if announcement_type == "PB":
-                        embed, img_file = build_personal_best_embed(track, stype, best_ms, when_utc, first, last, short, car_model)
+                        # Get rank information for PB subtitle
+                        current_rank, _ = get_player_rank(con, track, stype, best_ms, first or "", last or "")
+                        previous_rank = get_player_previous_rank(con, track, stype, best_ms, first or "", last or "")
+                        
+                        embed, img_file = build_personal_best_embed(
+                            track, stype, best_ms, when_utc, first, last, short, car_model,
+                            previous_rank=previous_rank, current_rank=current_rank
+                        )
                     else:  # TR (Track Record)
-                        embed, img_file = build_track_record_embed(track, stype, best_ms, when_utc, first, last, short, car_model)
+                        # Get previous record for improvement subtitle
+                        previous_record_ms = get_previous_track_record(con, track, stype, best_ms)
+                        
+                        embed, img_file = build_track_record_embed(
+                            track, stype, best_ms, when_utc, first, last, short, car_model,
+                            previous_record_ms=previous_record_ms
+                        )
                     
                     # Send embed with image if available
                     if img_file:

@@ -467,3 +467,42 @@ def mark_race_results_sent(con: sqlite3.Connection, announcement_id: int, messag
     )
     con.commit()
 
+
+def get_previous_track_record(con: sqlite3.Connection, track: str, session_type: str, current_best_ms: int) -> int | None:
+    """
+    Get the previous track record (second-best time) for a track and session type.
+    Returns None if no previous record exists.
+    """
+    result = con.execute(
+        """
+        SELECT MIN(e.best_lap_ms)
+        FROM entries e
+        JOIN sessions s ON e.session_id = s.session_id
+        WHERE s.track = ?
+          AND UPPER(s.session_type) = ?
+          AND e.best_lap_ms IS NOT NULL
+          AND e.best_lap_ms > ?
+        ORDER BY e.best_lap_ms ASC
+        LIMIT 1
+        """,
+        (track, session_type, current_best_ms)
+    ).fetchone()
+    
+    return result[0] if result else None
+
+
+def get_player_previous_rank(con: sqlite3.Connection, track: str, session_type: str, current_best_ms: int, first_name: str, last_name: str) -> int | None:
+    """
+    Get player's previous rank on a track (based on their previous PB).
+    Returns None if no previous PB exists.
+    """
+    # Get player's previous best time (excluding current one)
+    previous_pb = get_previous_pb(con, track, session_type, current_best_ms, first_name, last_name)
+    
+    if previous_pb is None:
+        return None
+    
+    # Calculate rank with previous PB
+    rank, _ = get_player_rank(con, track, session_type, previous_pb, first_name, last_name)
+    return rank
+
