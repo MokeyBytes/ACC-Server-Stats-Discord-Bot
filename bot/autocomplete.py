@@ -102,3 +102,50 @@ async def player_last_name_autocomplete(
         print(f"[WARN] Error in last_name autocomplete: {e}")
         return []
 
+
+async def player_name_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> list[app_commands.Choice[str]]:
+    """Autocomplete for full player names (first + last)."""
+    try:
+        con = sqlite3.connect(DB_PATH)
+        players = fetch_all_players(con)
+        con.close()
+        
+        # Create full names
+        full_names = []
+        for first, last in players:
+            if first or last:
+                full_name = f"{first or ''} {last or ''}".strip()
+                if full_name:
+                    full_names.append(full_name)
+        
+        # Remove duplicates and sort
+        unique_names = sorted(set(full_names))
+        
+        if not unique_names:
+            return []
+        
+        # Filter based on current input
+        current_lower = current.lower() if current else ""
+        if current_lower:
+            matches = [
+                app_commands.Choice(name=name, value=name)
+                for name in unique_names
+                if current_lower in name.lower()
+            ][:25]
+        else:
+            # If no input, return first 25 names
+            matches = [
+                app_commands.Choice(name=name, value=name)
+                for name in unique_names[:25]
+            ]
+        
+        return matches
+    except Exception as e:
+        print(f"[WARN] Error in player_name autocomplete: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
+

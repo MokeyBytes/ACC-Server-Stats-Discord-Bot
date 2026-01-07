@@ -9,15 +9,15 @@ from db.queries import (
     get_session_count, get_previous_pb, calculate_performance_percentage
 )
 from utils.formatting import fmt_ms, fmt_dt, fmt_split_ms, fmt_car_model
-from bot.autocomplete import player_first_name_autocomplete, player_last_name_autocomplete
+from bot.autocomplete import player_name_autocomplete
 
 
 def setup_pb_command(tree: app_commands.CommandTree):
     """Register the /pb command."""
     
     @tree.command(name="pb", description="Show personal bests for a player across all tracks")
-    @app_commands.autocomplete(first_name=player_first_name_autocomplete, last_name=player_last_name_autocomplete)
-    async def pb(interaction: discord.Interaction, first_name: str, last_name: str):
+    @app_commands.autocomplete(player=player_name_autocomplete)
+    async def pb(interaction: discord.Interaction, player: str):
         # Only allow in your target channel (optional safety)
         if interaction.channel_id != CHANNEL_ID:
             await interaction.response.send_message(
@@ -28,19 +28,29 @@ def setup_pb_command(tree: app_commands.CommandTree):
 
         await interaction.response.defer(thinking=True)
 
+        # Parse full name into first and last name
+        name_parts = player.strip().split(None, 1)  # Split on first space only
+        if len(name_parts) == 1:
+            # Only one name provided - treat as first name
+            first_name = name_parts[0]
+            last_name = ""
+        else:
+            first_name = name_parts[0]
+            last_name = name_parts[1]
+
         con = sqlite3.connect(DB_PATH)
         pbs = fetch_player_pbs(con, first_name, last_name)
 
         if not pbs:
             con.close()
             await interaction.followup.send(
-                f"No personal bests found for **{first_name} {last_name}**.\n\n"
+                f"No personal bests found for **{player}**.\n\n"
                 f"*Make sure you've spelled the name correctly.*"
             )
             return
 
         # Create embed
-        player_name = f"{first_name} {last_name}".strip()
+        player_name = player.strip()
         embed = discord.Embed(
             title=f"🎯 Personal Bests: {player_name}",
             color=discord.Color.green()
@@ -55,11 +65,11 @@ def setup_pb_command(tree: app_commands.CommandTree):
             car_name = fmt_car_model(car_model)
             when = fmt_dt(set_at_utc) if set_at_utc else "Unknown time"
             
-            # Get additional stats
-            rank, total = get_player_rank(con, track, stype, best_ms, first_name, last_name)
+            # Get additional stats (use parsed names)
+            rank, total = get_player_rank(con, track, stype, best_ms, first_name or "", last_name or "")
             track_record = get_track_record(con, track, stype)
-            session_count = get_session_count(con, track, stype, first_name, last_name)
-            previous_pb = get_previous_pb(con, track, stype, best_ms, first_name, last_name)
+            session_count = get_session_count(con, track, stype, first_name or "", last_name or "")
+            previous_pb = get_previous_pb(con, track, stype, best_ms, first_name or "", last_name or "")
             
             # Calculate gap to track record
             gap_to_record = None
