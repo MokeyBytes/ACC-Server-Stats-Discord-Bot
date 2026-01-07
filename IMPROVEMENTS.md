@@ -76,13 +76,19 @@ color=discord.Color.green()
 
 #### **C. Enhanced Embed Titles & Descriptions**
 ```python
-# Instead of: "🏆 New Track Record!"
-# Use: "🏆 NEW TRACK RECORD! 🏆"
-# Add subtitle (if previous record exists in DB): "Smashed the previous record by X.XXXs!"
+# ✅ IMPLEMENTED:
+# Track Record: "🏆 NEW TRACK RECORD! 🏆"
+# Personal Best: "🎯 PERSONAL BEST ACHIEVED! 🎯"
+# Description includes session type emoji (🏁 Qualifying, 🏎️ Race)
 
-# Instead of: "🎯 New Personal Best!"
-# Use: "🎯 PERSONAL BEST ACHIEVED! 🎯"  
-# Add subtitle (if rank data available in DB): "Moved up X positions on the leaderboard!"
+# 🔜 TODO: Add improvement subtitles (requires DB queries)
+# Track Record subtitle (if previous record exists in DB):
+#   "Smashed the previous record by X.XXXs!" 
+#   Implementation: Query records table for previous best_lap_ms, calculate difference
+
+# Personal Best subtitle (if rank data available in DB):
+#   "Moved up X positions on the leaderboard!"
+#   Implementation: Query player's previous rank vs new rank using get_player_rank()
 ```
 
 ---
