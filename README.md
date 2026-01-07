@@ -11,6 +11,10 @@ A Discord bot for Assetto Corsa Competizione servers that automatically tracks l
 - **🎯 Personal Bests** - Green embed when a driver beats their personal best
 - **🏁 Race Results** - Blue embed with full race standings after each race
 
+### What gets announced (and what doesn’t)
+- **Qualifying (`Q`) + Race (`R`)**: imported, tracked for records/PBs, and can generate announcements.
+- **Free Practice (`FP`)**: imported and stored in the DB, **but never announced** and **does not update records**.
+
 ### On-Demand Commands
 - View track leaderboards with top times
 - Check any driver's personal bests with detailed sector breakdowns
@@ -187,6 +191,25 @@ This watches for new race result JSON files and automatically imports them.
 
 ---
 
+## 📥 Importing an already-running server (backfill old JSON files)
+
+If your ACC server has been running for a while, you can import **existing** result files so the bot has history.
+
+- **Put old results in the results folder**: copy/move historical `*.json` into `RESULTS_DIR` (see `import_acc_results.py`).
+- **Run the importer**:
+
+```bash
+py import_acc_results.py
+```
+
+- **Start the bot** (`py run_bot.py`): it will pick up any queued announcements.
+
+Notes:
+- The importer is **idempotent** based on `sessions.source_file` (full path). If you import files from one path and later move them and import again, they may be treated as “new” and create duplicates.
+- Backfilling can create a backlog of TR/PB announcements; if you don’t want historical announcements, clear the queue tables before starting the bot (e.g., `record_announcements`, `race_results_announcements`).
+
+---
+
 ## 📁 Project Structure
 
 ```
@@ -231,12 +254,98 @@ SQLite database with these main tables:
 | `record_announcements` | Queue for TR/PB Discord posts |
 | `race_results_announcements` | Queue for race result posts |
 
+### Create Schema
+
+Run this SQL to create the database schema:
+
+```sql
+PRAGMA foreign_keys = ON;
+
+-- Session metadata
+CREATE TABLE IF NOT EXISTS sessions (
+    session_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_file TEXT NOT NULL UNIQUE,
+    session_type TEXT NOT NULL,
+    track TEXT NOT NULL,
+    server_name TEXT,
+    is_wet INTEGER,
+    session_index INTEGER,
+    race_weekend_index INTEGER,
+    file_mtime_utc TEXT NOT NULL
+);
+
+-- Driver entries per session
+CREATE TABLE IF NOT EXISTS entries (
+    entry_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL,
+    position INTEGER NOT NULL,
+    car_id INTEGER,
+    race_number INTEGER,
+    car_model INTEGER,
+    cup_category INTEGER,
+    car_group TEXT,
+    player_id TEXT,
+    first_name TEXT,
+    last_name TEXT,
+    short_name TEXT,
+    best_lap_ms INTEGER,
+    total_time_ms INTEGER,
+    lap_count INTEGER,
+    missing_mandatory_pitstop INTEGER,
+    best_splits_json TEXT,
+    FOREIGN KEY(session_id) REFERENCES sessions(session_id)
+);
+
+-- Track records (Q/R per track)
+CREATE TABLE IF NOT EXISTS records (
+    track TEXT NOT NULL,
+    session_type TEXT NOT NULL,
+    best_lap_ms INTEGER NOT NULL,
+    player_id TEXT,
+    first_name TEXT,
+    last_name TEXT,
+    short_name TEXT,
+    car_model INTEGER,
+    race_number INTEGER,
+    cup_category INTEGER,
+    set_session_id INTEGER,
+    set_at_utc TEXT NOT NULL,
+    PRIMARY KEY(track, session_type),
+    FOREIGN KEY(set_session_id) REFERENCES sessions(session_id)
+);
+
+-- Queue for track record and personal best announcements
+CREATE TABLE IF NOT EXISTS record_announcements (
+    announcement_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    track TEXT NOT NULL,
+    session_type TEXT NOT NULL,
+    best_lap_ms INTEGER NOT NULL,
+    announced_at_utc TEXT NOT NULL,
+    discord_message_id TEXT,
+    announcement_type TEXT DEFAULT 'TR'
+);
+
+-- Queue for race result announcements
+CREATE TABLE IF NOT EXISTS race_results_announcements (
+    announcement_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL UNIQUE,
+    track TEXT NOT NULL,
+    announced_at_utc TEXT NOT NULL,
+    discord_message_id TEXT,
+    FOREIGN KEY(session_id) REFERENCES sessions(session_id)
+);
+```
+
 ### Import Data
 ```bash
 py import_acc_results.py
 ```
 
 This imports all JSON files from your ACC server's results folder.
+
+Important:
+- The importer will **run migrations** (e.g., add `entries.best_splits_json`, add `record_announcements.announcement_type`) and will create `race_results_announcements` if needed.
+- The importer **assumes the base tables exist** (`sessions`, `entries`, `records`, `record_announcements`). Use the **Create Schema** SQL above when setting up a new DB.
 
 ---
 
