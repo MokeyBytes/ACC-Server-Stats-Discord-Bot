@@ -7,7 +7,7 @@ from config import DB_PATH, CHANNEL_ID
 from constants import DISCORD_FIELD_VALUE_LIMIT, DISCORD_EMBED_FIELD_LIMIT, TRACKS_PER_FIELD, DEFAULT_TOP_TIMES_LIMIT
 from db.queries import fetch_all_tracks_top_times
 from utils.formatting import fmt_ms, fmt_dt, fmt_car_model, format_driver_name
-from utils.errors import handle_command_error
+from utils.errors import handle_command_error, create_channel_restriction_embed
 from utils.logging_config import logger
 
 
@@ -18,10 +18,8 @@ def setup_leaders_command(tree: app_commands.CommandTree) -> None:
     async def leaders(interaction: discord.Interaction):
         # Only allow in your target channel (optional safety)
         if interaction.channel_id != CHANNEL_ID:
-            await interaction.response.send_message(
-                f"Use this in <#{CHANNEL_ID}>.",
-                ephemeral=True
-            )
+            embed = create_channel_restriction_embed(CHANNEL_ID)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
         await interaction.response.defer(thinking=True)

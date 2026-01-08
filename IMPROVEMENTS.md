@@ -124,18 +124,27 @@
 
 ## 🎯 User Interaction Improvements
 
-### 1. **Improve Channel Restriction Messaging**
+### 1. **Improve Channel Restriction Messaging** ✅ COMPLETED
 - **Issue**: Users get redirected but message is brief
 - **Solution**: Make the message more helpful and friendly
-- **Current**: `f"Use this in <#{CHANNEL_ID}>."`
-- **Improved**: 
+- **Status**: ✅ Implemented
+  - Created `create_channel_restriction_embed()` helper function in `utils/errors.py`
+  - Updated all command files to use the new embed instead of plain text:
+    - `bot/commands/records.py`
+    - `bot/commands/pb.py`
+    - `bot/commands/leaders.py`
+    - `bot/commands/tracks.py`
+    - `bot/commands/help.py`
+  - New embed includes:
+    - Clear title: "⚠️ Command Not Available Here"
+    - Helpful description with channel mention
+    - Orange color for warning
+    - Better user experience with formatted embed
+- **Before**: `f"Use this in <#{CHANNEL_ID}>."`
+- **After**: 
   ```python
-  embed = discord.Embed(
-      title="⚠️ Command Not Available Here",
-      description=f"This command can only be used in <#{CHANNEL_ID}>.\n\n"
-                  f"Please navigate to that channel to use bot commands.",
-      color=discord.Color.orange()
-  )
+  embed = create_channel_restriction_embed(CHANNEL_ID)
+  await interaction.response.send_message(embed=embed, ephemeral=True)
   ```
 
 ### 2. **Better Error Messages for Users**

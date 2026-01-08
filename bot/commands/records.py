@@ -8,7 +8,7 @@ from constants import DEFAULT_TOP_TIMES_LIMIT, MEDAL_EMOJIS
 from db.queries import find_track_match, fetch_track_top_times, fetch_available_tracks
 from utils.formatting import fmt_ms, fmt_dt, fmt_split_ms, fmt_car_model, format_driver_name
 from utils.images import find_track_image
-from utils.errors import handle_command_error, create_error_embed, create_warning_embed
+from utils.errors import handle_command_error, create_error_embed, create_warning_embed, create_channel_restriction_embed
 from utils.logging_config import logger
 from bot.autocomplete import track_autocomplete
 
@@ -21,10 +21,8 @@ def setup_records_command(tree: app_commands.CommandTree) -> None:
     async def records(interaction: discord.Interaction, track: str):
         # Only allow in your target channel (optional safety)
         if interaction.channel_id != CHANNEL_ID:
-            await interaction.response.send_message(
-                f"Use this in <#{CHANNEL_ID}>.",
-                ephemeral=True
-            )
+            embed = create_channel_restriction_embed(CHANNEL_ID)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
         await interaction.response.defer(thinking=True)

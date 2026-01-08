@@ -6,7 +6,7 @@ from discord import app_commands
 from config import DB_PATH, CHANNEL_ID
 from constants import DISCORD_FIELD_VALUE_LIMIT
 from db.queries import fetch_available_tracks
-from utils.errors import handle_command_error
+from utils.errors import handle_command_error, create_channel_restriction_embed
 from utils.logging_config import logger
 
 
@@ -17,10 +17,8 @@ def setup_tracks_command(tree: app_commands.CommandTree) -> None:
     async def tracks(interaction: discord.Interaction):
         # Only allow in your target channel (optional safety)
         if interaction.channel_id != CHANNEL_ID:
-            await interaction.response.send_message(
-                f"Use this in <#{CHANNEL_ID}>.",
-                ephemeral=True
-            )
+            embed = create_channel_restriction_embed(CHANNEL_ID)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
         await interaction.response.defer(thinking=True)

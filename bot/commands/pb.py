@@ -12,7 +12,7 @@ from db.queries import (
 )
 from utils.formatting import fmt_ms, fmt_dt, fmt_split_ms, fmt_car_model
 from utils.images import find_track_image
-from utils.errors import handle_command_error, create_warning_embed
+from utils.errors import handle_command_error, create_warning_embed, create_channel_restriction_embed
 from utils.logging_config import logger
 from bot.autocomplete import player_name_autocomplete, track_autocomplete
 
@@ -25,10 +25,8 @@ def setup_pb_command(tree: app_commands.CommandTree) -> None:
     async def pb(interaction: discord.Interaction, player: str, track: str):
         # Only allow in your target channel (optional safety)
         if interaction.channel_id != CHANNEL_ID:
-            await interaction.response.send_message(
-                f"Use this in <#{CHANNEL_ID}>.",
-                ephemeral=True
-            )
+            embed = create_channel_restriction_embed(CHANNEL_ID)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
         await interaction.response.defer(thinking=True)

@@ -64,6 +64,27 @@ def create_warning_embed(title: str, description: str) -> discord.Embed:
     return embed
 
 
+def create_channel_restriction_embed(channel_id: int) -> discord.Embed:
+    """
+    Create an embed for channel restriction messages.
+    
+    Args:
+        channel_id: The Discord channel ID where the command should be used
+    
+    Returns:
+        Discord embed with channel restriction information
+    """
+    embed = discord.Embed(
+        title="⚠️ Command Not Available Here",
+        description=(
+            f"This command can only be used in <#{channel_id}>.\n\n"
+            f"Please navigate to that channel to use bot commands."
+        ),
+        color=discord.Color.orange()
+    )
+    return embed
+
+
 def handle_database_error(error: Exception, operation: str) -> None:
     """
     Log database errors with context.

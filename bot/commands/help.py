@@ -3,6 +3,7 @@ import discord
 from discord import app_commands
 
 from config import CHANNEL_ID
+from utils.errors import create_channel_restriction_embed
 from constants import DEFAULT_TOP_TIMES_LIMIT
 
 
@@ -13,10 +14,8 @@ def setup_help_command(tree: app_commands.CommandTree) -> None:
     async def help(interaction: discord.Interaction):
         # Only allow in your target channel (optional safety)
         if interaction.channel_id != CHANNEL_ID:
-            await interaction.response.send_message(
-                f"Use this in <#{CHANNEL_ID}>.",
-                ephemeral=True
-            )
+            embed = create_channel_restriction_embed(CHANNEL_ID)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
         embed = discord.Embed(
