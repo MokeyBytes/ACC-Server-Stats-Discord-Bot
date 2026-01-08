@@ -104,12 +104,24 @@
 - **Solution**: Split into smaller, focused functions
 - **Files affected**: pb.py, leaders.py
 
-### 6. **Improve SQL Query Organization**
+### 6. **Improve SQL Query Organization** ✅ COMPLETED
 - **Issue**: Long SQL queries embedded in Python code
 - **Solution**: 
-  - Consider using SQLAlchemy for complex queries (optional)
-  - Or at least extract complex queries to separate functions with clear names
+  - Extract complex queries to separate functions with clear names
   - Add comments explaining complex JOIN logic
+- **Status**: ✅ Implemented
+  - Created helper function `_get_driver_info_subquery()` to eliminate repetitive subqueries in `fetch_queue()`
+  - Extracted common query pattern into `_get_top_times_for_session_type()` helper function
+  - Extracted duplicate logic in `fetch_all_tracks_top_times()` into `_get_best_time_for_track_session()` helper
+  - Added comprehensive comments explaining:
+    - CTE (Common Table Expression) usage and purpose
+    - Window functions (ROW_NUMBER() OVER PARTITION BY)
+    - JOIN logic and why specific joins are used
+    - Correlated subqueries and their purpose
+    - GROUP BY aggregations
+    - Query step-by-step logic in complex functions
+  - Improved function docstrings with detailed parameter and return value descriptions
+  - All complex queries now have inline comments explaining the logic
 - **Files affected**: db/queries.py
 
 ### 7. **Standardize Track Name Formatting**
