@@ -59,3 +59,24 @@ def fmt_dt(iso_utc: str) -> str:
         et_dt = dt + timedelta(hours=offset_hours)
         return et_dt.strftime(f"%Y-%m-%d %H:%M {tz_abbr}")
 
+
+def format_driver_name(first: str | None, last: str | None, short: str | None) -> str:
+    """
+    Format a driver's name from first name, last name, and short name.
+    
+    Priority: first + last name > short name > "Unknown"
+    
+    Args:
+        first: Driver's first name (can be None or empty)
+        last: Driver's last name (can be None or empty)
+        short: Driver's short name (can be None or empty)
+    
+    Returns:
+        Formatted driver name string
+    """
+    if first or last:
+        return f"{(first or '').strip()} {(last or '').strip()}".strip()
+    elif short:
+        return short
+    return "Unknown"
+

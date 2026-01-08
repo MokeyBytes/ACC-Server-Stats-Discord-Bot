@@ -2,18 +2,15 @@
 import discord
 from datetime import datetime, timezone
 
-from utils.formatting import fmt_ms, fmt_dt, fmt_split_ms, fmt_car_model
+from constants import MEDAL_EMOJIS, MAX_RACE_RESULTS_DISPLAY, TOP_3_POSITIONS
+from utils.formatting import fmt_ms, fmt_dt, fmt_split_ms, fmt_car_model, format_driver_name
 from utils.images import find_track_image
 
 
 def build_track_record_embed(track, stype, best_ms, when_utc, first, last, short, car_model, previous_record_ms=None):
     """Build a Discord embed for track record announcements."""
     session_label = "Qualifying" if stype == "Q" else "Race"
-    who = "Unknown driver"
-    if first or last:
-        who = f"{(first or '').strip()} {(last or '').strip()}".strip()
-    elif short:
-        who = short
+    who = format_driver_name(first, last, short)
 
     car_name = fmt_car_model(car_model)
     
@@ -70,11 +67,7 @@ def build_track_record_embed(track, stype, best_ms, when_utc, first, last, short
 def build_personal_best_embed(track, stype, best_ms, when_utc, first, last, short, car_model, previous_rank=None, current_rank=None):
     """Build a Discord embed for personal best announcements."""
     session_label = "Qualifying" if stype == "Q" else "Race"
-    who = "Unknown driver"
-    if first or last:
-        who = f"{(first or '').strip()} {(last or '').strip()}".strip()
-    elif short:
-        who = short
+    who = format_driver_name(first, last, short)
 
     car_name = fmt_car_model(car_model)
     
@@ -164,24 +157,16 @@ def build_race_results_embed(track, session_data, entries, when_utc):
     leader_total_ms = entries[0][7] if entries and entries[0][7] else None
     leader_best_ms = entries[0][6] if entries and entries[0][6] else None
     
-    # Medals for top 3
-    medals = {1: "🥇", 2: "🥈", 3: "🥉"}
-    
     # Build standings
     standings_lines = []
-    for entry in entries[:10]:  # Limit to top 10 for embed space
+    for entry in entries[:MAX_RACE_RESULTS_DISPLAY]:  # Limit to top N for embed space
         position, first_name, last_name, short_name, car_model, race_number, best_lap_ms, total_time_ms, entry_lap_count, car_group = entry
         
         # Format driver name
-        if first_name or last_name:
-            driver_name = f"{(first_name or '').strip()} {(last_name or '').strip()}".strip()
-        elif short_name:
-            driver_name = short_name
-        else:
-            driver_name = "Unknown"
+        driver_name = format_driver_name(first_name, last_name, short_name)
         
         car_name = fmt_car_model(car_model)
-        medal = medals.get(position, "")
+        medal = MEDAL_EMOJIS.get(position, "")
         
         # Calculate gap to leader
         if position == 1:
@@ -208,7 +193,7 @@ def build_race_results_embed(track, session_data, entries, when_utc):
             best_lap_str = "No time"
         
         # Build the line
-        if position <= 3:
+        if position in TOP_3_POSITIONS:
             line = f"{medal} **{position}.** **{driver_name}**"
         else:
             line = f"**{position}.** {driver_name}"
@@ -242,7 +227,7 @@ def build_race_results_embed(track, session_data, entries, when_utc):
         fastest_entry = min((e for e in entries if e[6]), key=lambda x: x[6], default=None)
         if fastest_entry:
             fl_position, fl_first, fl_last, fl_short, fl_car, fl_num, fl_best, _, _, _ = fastest_entry
-            fl_driver = f"{(fl_first or '').strip()} {(fl_last or '').strip()}".strip() or fl_short or "Unknown"
+            fl_driver = format_driver_name(fl_first, fl_last, fl_short)
             embed.add_field(
                 name="⚡ Fastest Lap",
                 value=f"**{fmt_ms(fl_best)}** — {fl_driver} ({fmt_car_model(fl_car)})",

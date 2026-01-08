@@ -4,16 +4,19 @@ import discord
 from discord import app_commands
 
 from config import DB_PATH, CHANNEL_ID
+from constants import DEFAULT_TOP_TIMES_LIMIT, MEDAL_EMOJIS
 from db.queries import find_track_match, fetch_track_top_times, fetch_available_tracks
-from utils.formatting import fmt_ms, fmt_dt, fmt_split_ms, fmt_car_model
+from utils.formatting import fmt_ms, fmt_dt, fmt_split_ms, fmt_car_model, format_driver_name
 from utils.images import find_track_image
+from utils.errors import handle_command_error, create_error_embed, create_warning_embed
+from utils.logging_config import logger
 from bot.autocomplete import track_autocomplete
 
 
 def setup_records_command(tree: app_commands.CommandTree):
     """Register the /records command."""
     
-    @tree.command(name="records", description="Show top 3 times for a specific track (Q and R)")
+    @tree.command(name="records", description=f"Show top {DEFAULT_TOP_TIMES_LIMIT} times for a specific track (Q and R)")
     @app_commands.autocomplete(track=track_autocomplete)
     async def records(interaction: discord.Interaction, track: str):
         # Only allow in your target channel (optional safety)
@@ -26,33 +29,51 @@ def setup_records_command(tree: app_commands.CommandTree):
 
         await interaction.response.defer(thinking=True)
 
-        con = sqlite3.connect(DB_PATH)
-        
-        # Try to find matching track name (case-insensitive)
-        actual_track = find_track_match(con, track)
-        if not actual_track:
-            available = fetch_available_tracks(con)
+        try:
+            con = sqlite3.connect(DB_PATH)
+            
+            # Try to find matching track name (case-insensitive)
+            actual_track = find_track_match(con, track)
+            if not actual_track:
+                available = fetch_available_tracks(con)
+                con.close()
+                
+                track_list = ", ".join([t[0] for t in available[:20]])  # Show first 20
+                if len(available) > 20:
+                    track_list += f", ... ({len(available)} total)"
+                
+                embed = create_warning_embed(
+                    title="Track Not Found",
+                    description=(
+                        f"No track found matching **{track}**.\n\n"
+                        f"Use `/tracks` to see all available tracks.\n"
+                        f"*Track names are case-insensitive and can use spaces or underscores.*"
+                    )
+                )
+                await interaction.followup.send(embed=embed)
+                return
+            
+            # Get top times for both Q and R
+            q_times, r_times = fetch_track_top_times(con, actual_track, limit=DEFAULT_TOP_TIMES_LIMIT)
             con.close()
-            
-            track_list = ", ".join([t[0] for t in available[:20]])  # Show first 20
-            if len(available) > 20:
-                track_list += f", ... ({len(available)} total)"
-            
-            await interaction.followup.send(
-                f"No track found matching **{track}**.\n\n"
-                f"Use `/tracks` to see all available tracks.\n"
-                f"*Track names are case-insensitive and can use spaces or underscores.*"
-            )
-            return
-        
-        # Get top 3 times for both Q and R
-        q_times, r_times = fetch_track_top_times(con, actual_track, limit=3)
-        con.close()
 
-        if not q_times and not r_times:
-            await interaction.followup.send(
-                f"No times found for track **{actual_track}** yet."
-            )
+            if not q_times and not r_times:
+                embed = create_warning_embed(
+                    title="No Times Found",
+                    description=(
+                        f"No times found for track **{actual_track}** yet.\n\n"
+                        f"*Times will appear here once drivers complete sessions on this track.*"
+                    )
+                )
+                await interaction.followup.send(embed=embed)
+                return
+        except sqlite3.Error as e:
+            con.close()
+            await handle_command_error(interaction, e, "retrieving track records")
+            return
+        except Exception as e:
+            con.close()
+            await handle_command_error(interaction, e, "processing your request")
             return
 
         # Create embed
@@ -66,24 +87,15 @@ def setup_records_command(tree: app_commands.CommandTree):
         if img_file:
             embed.set_thumbnail(url=f"attachment://{img_filename}")
         
-        # Helper function to format driver name
-        def format_driver(first, last, short):
-            if first or last:
-                return f"{(first or '').strip()} {(last or '').strip()}".strip()
-            elif short:
-                return short
-            return "Unknown"
-        
         # Qualifying section
         if q_times:
             leader_ms = q_times[0][1]  # Best time from first entry
-            medals = {1: "🥇", 2: "🥈", 3: "🥉"}
             times_list = []
             
-            for idx, (stype, best_ms, first, last, short, car_model, set_at_utc) in enumerate(q_times[:3], 1):
-                who = format_driver(first, last, short)
+            for idx, (stype, best_ms, first, last, short, car_model, set_at_utc) in enumerate(q_times[:DEFAULT_TOP_TIMES_LIMIT], 1):
+                who = format_driver_name(first, last, short)
                 car_name = fmt_car_model(car_model)
-                medal = medals.get(idx, "")
+                medal = MEDAL_EMOJIS.get(idx, "")
                 
                 if idx == 1:
                     # First place - no split needed
@@ -109,13 +121,12 @@ def setup_records_command(tree: app_commands.CommandTree):
         # Race section
         if r_times:
             leader_ms = r_times[0][1]  # Best time from first entry
-            medals = {1: "🥇", 2: "🥈", 3: "🥉"}
             times_list = []
             
-            for idx, (stype, best_ms, first, last, short, car_model, set_at_utc) in enumerate(r_times[:3], 1):
-                who = format_driver(first, last, short)
+            for idx, (stype, best_ms, first, last, short, car_model, set_at_utc) in enumerate(r_times[:DEFAULT_TOP_TIMES_LIMIT], 1):
+                who = format_driver_name(first, last, short)
                 car_name = fmt_car_model(car_model)
-                medal = medals.get(idx, "")
+                medal = MEDAL_EMOJIS.get(idx, "")
                 
                 if idx == 1:
                     # First place - no split needed
@@ -142,8 +153,12 @@ def setup_records_command(tree: app_commands.CommandTree):
         embed.set_footer(text="Use /leaders to see all track leaders")
         
         # Send embed with image file if found
-        if img_file:
-            await interaction.followup.send(embed=embed, file=img_file)
-        else:
-            await interaction.followup.send(embed=embed)
+        try:
+            if img_file:
+                await interaction.followup.send(embed=embed, file=img_file)
+            else:
+                await interaction.followup.send(embed=embed)
+        except Exception as e:
+            logger.error(f"Failed to send records embed: {e}", exc_info=True)
+            await handle_command_error(interaction, e, "sending the results")
 

@@ -17,6 +17,8 @@ from bot.commands.leaders import setup_leaders_command
 from bot.commands.tracks import setup_tracks_command
 from bot.commands.sync import setup_sync_command
 from bot.commands.help import setup_help_command
+from utils.logging_config import logger
+from utils.errors import handle_database_error
 
 
 def create_bot() -> tuple[discord.Client, app_commands.CommandTree]:
@@ -37,18 +39,18 @@ def create_bot() -> tuple[discord.Client, app_commands.CommandTree]:
     async def on_ready():
         channel = client.get_channel(CHANNEL_ID)
         if channel is None:
-            print(f"[ERR] Could not find channel {CHANNEL_ID}. Is the bot in the server and has access?")
+            logger.error(f"Could not find channel {CHANNEL_ID}. Is the bot in the server and has access?")
             return
 
-        print(f"[OK] Logged in as {client.user}. Watching for queued record announcements...")
+        logger.info(f"Logged in as {client.user}. Watching for queued record announcements...")
 
         try:
             synced = await tree.sync()
-            print(f"[OK] Slash commands synced ({len(synced)} commands)")
+            logger.info(f"Slash commands synced ({len(synced)} commands)")
             for cmd in synced:
-                print(f"  - /{cmd.name}")
+                logger.debug(f"  - /{cmd.name}")
         except Exception as e:
-            print(f"[ERR] Failed to sync commands: {e}")
+            logger.error(f"Failed to sync commands: {e}", exc_info=True)
 
         while True:
             try:
@@ -103,16 +105,16 @@ def create_bot() -> tuple[discord.Client, app_commands.CommandTree]:
                             
                             mark_race_results_sent(con, announcement_id, sent.id)
                         else:
-                            print(f"[WARN] No data found for race session {session_id}")
+                            logger.warning(f"No data found for race session {session_id}")
                 except Exception as e:
                     # Table might not exist yet, ignore
                     if "no such table" not in str(e).lower():
-                        print(f"[WARN] Race results error: {e}")
+                        handle_database_error(e, "processing race results")
 
                 con.close()
 
             except Exception as e:
-                print(f"[WARN] loop error: {e}")
+                logger.warning(f"Error in announcement loop: {e}", exc_info=True)
 
             await asyncio.sleep(POLL_SECONDS)
     

@@ -1,6 +1,7 @@
 """Database query functions."""
 import sqlite3
 from config import BATCH_SIZE
+from constants import DEFAULT_TOP_TIMES_LIMIT
 
 
 def fetch_queue(con: sqlite3.Connection):
@@ -108,7 +109,7 @@ def find_track_match(con: sqlite3.Connection, track_input: str) -> str:
     return None
 
 
-def fetch_track_top_times(con: sqlite3.Connection, track_name: str, limit: int = 3):
+def fetch_track_top_times(con: sqlite3.Connection, track_name: str, limit: int = DEFAULT_TOP_TIMES_LIMIT):
     """Get top N times for a specific track, for both Q and R session types."""
     # Get top times for Qualifying
     q_times = con.execute(

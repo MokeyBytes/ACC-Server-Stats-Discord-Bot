@@ -5,12 +5,15 @@ import discord
 from discord import app_commands
 
 from config import DB_PATH, CHANNEL_ID
+from constants import MEDAL_EMOJIS, TOP_3_POSITIONS
 from db.queries import (
     find_track_match, fetch_player_pb_with_sectors, fetch_track_record_with_sectors,
     get_player_rank, get_session_count, get_previous_pb
 )
 from utils.formatting import fmt_ms, fmt_dt, fmt_split_ms, fmt_car_model
 from utils.images import find_track_image
+from utils.errors import handle_command_error, create_warning_embed
+from utils.logging_config import logger
 from bot.autocomplete import player_name_autocomplete, track_autocomplete
 
 
@@ -30,44 +33,53 @@ def setup_pb_command(tree: app_commands.CommandTree):
 
         await interaction.response.defer(thinking=True)
 
-        # Parse full name into first and last name
-        name_parts = player.strip().split(None, 1)
-        if len(name_parts) == 1:
-            first_name = name_parts[0]
-            last_name = ""
-        else:
-            first_name = name_parts[0]
-            last_name = name_parts[1]
+        try:
+            # Parse full name into first and last name
+            name_parts = player.strip().split(None, 1)
+            if len(name_parts) == 1:
+                first_name = name_parts[0]
+                last_name = ""
+            else:
+                first_name = name_parts[0]
+                last_name = name_parts[1]
 
-        con = sqlite3.connect(DB_PATH)
-        
-        # Find matching track name
-        actual_track = find_track_match(con, track)
-        if not actual_track:
-            con.close()
-            await interaction.followup.send(
-                f"Track **{track}** not found.\n"
-                f"Use `/tracks` to see all available tracks."
-            )
-            return
+            con = sqlite3.connect(DB_PATH)
+            
+            # Find matching track name
+            actual_track = find_track_match(con, track)
+            if not actual_track:
+                con.close()
+                embed = create_warning_embed(
+                    title="Track Not Found",
+                    description=(
+                        f"Track **{track}** not found.\n\n"
+                        f"Use `/tracks` to see all available tracks."
+                    )
+                )
+                await interaction.followup.send(embed=embed)
+                return
 
-        # Get PB data for both Q and R
-        q_pb = fetch_player_pb_with_sectors(con, first_name or "", last_name or "", actual_track, "Q")
-        r_pb = fetch_player_pb_with_sectors(con, first_name or "", last_name or "", actual_track, "R")
+            # Get PB data for both Q and R
+            q_pb = fetch_player_pb_with_sectors(con, first_name or "", last_name or "", actual_track, "Q")
+            r_pb = fetch_player_pb_with_sectors(con, first_name or "", last_name or "", actual_track, "R")
 
-        if not q_pb and not r_pb:
-            con.close()
-            await interaction.followup.send(
-                f"No personal bests found for **{player}** at **{actual_track}**.\n\n"
-                f"*Make sure you've spelled the name correctly.*"
-            )
-            return
+            if not q_pb and not r_pb:
+                con.close()
+                embed = create_warning_embed(
+                    title="No Personal Bests Found",
+                    description=(
+                        f"No personal bests found for **{player}** at **{actual_track}**.\n\n"
+                        f"*Make sure you've spelled the name correctly. Use autocomplete to help find the correct name.*"
+                    )
+                )
+                await interaction.followup.send(embed=embed)
+                return
 
-        # Get track records for comparison
-        q_record = fetch_track_record_with_sectors(con, actual_track, "Q")
-        r_record = fetch_track_record_with_sectors(con, actual_track, "R")
+            # Get track records for comparison
+            q_record = fetch_track_record_with_sectors(con, actual_track, "Q")
+            r_record = fetch_track_record_with_sectors(con, actual_track, "R")
 
-        # Create embed
+            # Create embed
         embed = discord.Embed(
             title=f"🎯 Personal Best: {player}",
             description=f"🏁 **{actual_track}**",
@@ -186,7 +198,7 @@ def setup_pb_command(tree: app_commands.CommandTree):
             # Add rank
             rank, total = get_player_rank(con, actual_track, "Q", q_best_ms, first_name or "", last_name or "")
             if rank and total:
-                medal = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else ""
+                medal = MEDAL_EMOJIS.get(rank, "")
                 q_value += f"📊 **Rank**: {medal} #{rank} of {total}\n"
             
             # Add gap to record
@@ -241,7 +253,7 @@ def setup_pb_command(tree: app_commands.CommandTree):
             # Add rank
             rank, total = get_player_rank(con, actual_track, "R", r_best_ms, first_name or "", last_name or "")
             if rank and total:
-                medal = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else ""
+                medal = MEDAL_EMOJIS.get(rank, "")
                 r_value += f"📊 **Rank**: {medal} #{rank} of {total}\n"
             
             # Add gap to record
@@ -273,10 +285,27 @@ def setup_pb_command(tree: app_commands.CommandTree):
                     inline=False
                 )
 
-        con.close()
+            con.close()
 
-        # Send embed
-        if img_file:
-            await interaction.followup.send(embed=embed, file=img_file)
-        else:
-            await interaction.followup.send(embed=embed)
+            # Send embed
+            try:
+                if img_file:
+                    await interaction.followup.send(embed=embed, file=img_file)
+                else:
+                    await interaction.followup.send(embed=embed)
+            except Exception as e:
+                logger.error(f"Failed to send PB embed: {e}", exc_info=True)
+                await handle_command_error(interaction, e, "sending the results")
+                
+        except sqlite3.Error as e:
+            try:
+                con.close()
+            except:
+                pass
+            await handle_command_error(interaction, e, "retrieving personal best data")
+        except Exception as e:
+            try:
+                con.close()
+            except:
+                pass
+            await handle_command_error(interaction, e, "processing your request")

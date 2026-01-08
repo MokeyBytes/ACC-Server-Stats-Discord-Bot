@@ -4,8 +4,11 @@ import discord
 from discord import app_commands
 
 from config import DB_PATH, CHANNEL_ID
+from constants import DISCORD_FIELD_VALUE_LIMIT, DISCORD_EMBED_FIELD_LIMIT, TRACKS_PER_FIELD, DEFAULT_TOP_TIMES_LIMIT
 from db.queries import fetch_all_tracks_top_times
-from utils.formatting import fmt_ms, fmt_dt, fmt_car_model
+from utils.formatting import fmt_ms, fmt_dt, fmt_car_model, format_driver_name
+from utils.errors import handle_command_error
+from utils.logging_config import logger
 
 
 def setup_leaders_command(tree: app_commands.CommandTree):
@@ -23,11 +26,12 @@ def setup_leaders_command(tree: app_commands.CommandTree):
 
         await interaction.response.defer(thinking=True)
 
-        con = sqlite3.connect(DB_PATH)
-        tracks_data = fetch_all_tracks_top_times(con)
-        con.close()
+        try:
+            con = sqlite3.connect(DB_PATH)
+            tracks_data = fetch_all_tracks_top_times(con)
+            con.close()
 
-        if not tracks_data:
+            if not tracks_data:
             embed = discord.Embed(
                 title="🏆 Server Leaders",
                 description="No track records found in the database yet.",
@@ -36,14 +40,6 @@ def setup_leaders_command(tree: app_commands.CommandTree):
             await interaction.followup.send(embed=embed)
             return
 
-        # Helper function to format driver name
-        def format_driver(first, last, short):
-            if first or last:
-                return f"{(first or '').strip()} {(last or '').strip()}".strip()
-            elif short:
-                return short
-            return "Unknown"
-
         # Helper function to format a track entry
         def format_track_entry(track, q_data, r_data):
             lines = [f"**{track}**"]
@@ -51,7 +47,7 @@ def setup_leaders_command(tree: app_commands.CommandTree):
             # Qualifying
             if q_data:
                 best_ms, first, last, short, car_model, set_at_utc = q_data
-                who = format_driver(first, last, short)
+                who = format_driver_name(first, last, short)
                 car_name = fmt_car_model(car_model)
                 when = fmt_dt(set_at_utc) if set_at_utc else "Unknown"
                 lines.append(f"🏁 **Q:** {fmt_ms(best_ms)} — {who}\n   `{car_name}` • {when}")
@@ -61,7 +57,7 @@ def setup_leaders_command(tree: app_commands.CommandTree):
             # Race
             if r_data:
                 best_ms, first, last, short, car_model, set_at_utc = r_data
-                who = format_driver(first, last, short)
+                who = format_driver_name(first, last, short)
                 car_name = fmt_car_model(car_model)
                 when = fmt_dt(set_at_utc) if set_at_utc else "Unknown"
                 lines.append(f"🏎️ **R:** {fmt_ms(best_ms)} — {who}\n   `{car_name}` • {when}")
@@ -72,7 +68,7 @@ def setup_leaders_command(tree: app_commands.CommandTree):
 
         # Create embeds with organized fields
         # Discord embed field value limit is 1024 characters
-        # We'll group 2-3 tracks per field for readability
+        # We'll group tracks per field for readability
         embeds = []
         current_embed = discord.Embed(
             title="🏆 Server Leaders - All Tracks",
@@ -83,7 +79,6 @@ def setup_leaders_command(tree: app_commands.CommandTree):
         current_field_value = ""
         tracks_in_current_field = 0
         field_count = 0
-        tracks_per_field = 2  # Group 2 tracks per field for readability
         track_number = 0
         
         for track in sorted(tracks_data.keys()):
@@ -93,8 +88,8 @@ def setup_leaders_command(tree: app_commands.CommandTree):
             
             track_entry = format_track_entry(track, q_data, r_data)
             
-            # Check if we need a new embed (25 field limit per embed)
-            if field_count >= 25:
+            # Check if we need a new embed (Discord field limit per embed)
+            if field_count >= DISCORD_EMBED_FIELD_LIMIT:
                 # Save current field if it has content
                 if current_field_value:
                     start_track = track_number - tracks_in_current_field
@@ -123,7 +118,7 @@ def setup_leaders_command(tree: app_commands.CommandTree):
             
             tracks_in_current_field += 1
             
-            # Check if we should finalize this field (after tracks_per_field tracks or if next would exceed limit)
+            # Check if we should finalize this field (after TRACKS_PER_FIELD tracks or if next would exceed limit)
             test_next_entry = ""
             if track_number < len(tracks_data):
                 next_track = sorted(tracks_data.keys())[track_number]
@@ -132,8 +127,8 @@ def setup_leaders_command(tree: app_commands.CommandTree):
                 test_next_entry = "\n\n" + format_track_entry(next_track, next_q, next_r)
             
             should_finalize = (
-                tracks_in_current_field >= tracks_per_field or
-                len(current_field_value + test_next_entry) > 1024
+                tracks_in_current_field >= TRACKS_PER_FIELD or
+                len(current_field_value + test_next_entry) > DISCORD_FIELD_VALUE_LIMIT
             )
             
             if should_finalize or track_number == len(tracks_data):
@@ -152,13 +147,30 @@ def setup_leaders_command(tree: app_commands.CommandTree):
         
         # Add footer to last embed
         final_embed = embeds[-1] if embeds else current_embed
-        final_embed.set_footer(text="💡 Use /records <track> to see top 3 times for a specific track")
+        final_embed.set_footer(text=f"💡 Use /records <track> to see top {DEFAULT_TOP_TIMES_LIMIT} times for a specific track")
         
-        # Send all embeds
-        if embeds:
-            for embed in embeds:
-                await interaction.followup.send(embed=embed)
-        
-        if current_embed.fields:
-            await interaction.followup.send(embed=current_embed)
+            # Send all embeds
+            try:
+                if embeds:
+                    for embed in embeds:
+                        await interaction.followup.send(embed=embed)
+                
+                if current_embed.fields:
+                    await interaction.followup.send(embed=current_embed)
+            except Exception as e:
+                logger.error(f"Failed to send leaders embeds: {e}", exc_info=True)
+                await handle_command_error(interaction, e, "sending the results")
+                
+        except sqlite3.Error as e:
+            try:
+                con.close()
+            except:
+                pass
+            await handle_command_error(interaction, e, "retrieving leaderboard data")
+        except Exception as e:
+            try:
+                con.close()
+            except:
+                pass
+            await handle_command_error(interaction, e, "processing your request")
 

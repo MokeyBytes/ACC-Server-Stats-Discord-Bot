@@ -2,6 +2,9 @@
 import discord
 from discord import app_commands
 
+from utils.errors import handle_command_error, create_error_embed
+from utils.logging_config import logger
+
 
 def setup_sync_command(tree: app_commands.CommandTree):
     """Register the /sync command."""
@@ -21,12 +24,14 @@ def setup_sync_command(tree: app_commands.CommandTree):
                 f"Try restarting Discord if `/pb` still doesn't show up.",
                 ephemeral=True
             )
-            print(f"[OK] Manually synced {len(synced)} commands")
+            logger.info(f"Manually synced {len(synced)} commands")
             for cmd in synced:
-                print(f"  - /{cmd.name}")
+                logger.debug(f"  - /{cmd.name}")
         except Exception as e:
-            await interaction.followup.send(f"❌ Error syncing commands: {e}", ephemeral=True)
-            print(f"[ERR] Sync error: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"Sync error: {e}", exc_info=True)
+            embed = create_error_embed(
+                title="Sync Failed",
+                description="Failed to sync commands with Discord. Please try again later."
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
 

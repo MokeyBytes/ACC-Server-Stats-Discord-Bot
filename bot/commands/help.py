@@ -3,6 +3,7 @@ import discord
 from discord import app_commands
 
 from config import CHANNEL_ID
+from constants import DEFAULT_TOP_TIMES_LIMIT
 
 
 def setup_help_command(tree: app_commands.CommandTree):
@@ -28,7 +29,7 @@ def setup_help_command(tree: app_commands.CommandTree):
         embed.add_field(
             name="🏁 `/records <track>`",
             value=(
-                "Show the top 3 Qualifying and Race times for a specific track.\n"
+                f"Show the top {DEFAULT_TOP_TIMES_LIMIT} Qualifying and Race times for a specific track.\n"
                 "**Usage:** `/records Barcelona`\n"
                 "**Example:** Displays leaderboard with medals (🥇🥈🥉) and splits to leader."
             ),

@@ -4,7 +4,9 @@ import discord
 from discord import app_commands
 
 from config import DB_PATH
+from constants import DISCORD_AUTOCOMPLETE_LIMIT
 from db.queries import fetch_available_tracks, fetch_all_players
+from utils.logging_config import logger
 
 
 async def track_autocomplete(
@@ -22,7 +24,7 @@ async def track_autocomplete(
         app_commands.Choice(name=track[0], value=track[0])
         for track in available
         if current_lower in track[0].lower()
-    ][:25]  # Discord limit is 25 choices
+    ][:DISCORD_AUTOCOMPLETE_LIMIT]
     
     return matches
 
@@ -49,19 +51,17 @@ async def player_first_name_autocomplete(
                 app_commands.Choice(name=name, value=name)
                 for name in first_names
                 if current_lower in name.lower()
-            ][:25]
+            ][:DISCORD_AUTOCOMPLETE_LIMIT]
         else:
-            # If no input, return first 25 names
+            # If no input, return first N names
             matches = [
                 app_commands.Choice(name=name, value=name)
-                for name in first_names[:25]
+                for name in first_names[:DISCORD_AUTOCOMPLETE_LIMIT]
             ]
         
         return matches
     except Exception as e:
-        print(f"[WARN] Error in first_name autocomplete: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.warning(f"Error in first_name autocomplete: {e}", exc_info=True)
         return []
 
 
@@ -95,11 +95,11 @@ async def player_last_name_autocomplete(
             app_commands.Choice(name=name, value=name)
             for name in last_names
             if current_lower in name.lower()
-        ][:25]
+        ][:DISCORD_AUTOCOMPLETE_LIMIT]
         
         return matches
     except Exception as e:
-        print(f"[WARN] Error in last_name autocomplete: {e}")
+        logger.warning(f"Error in last_name autocomplete: {e}", exc_info=True)
         return []
 
 
@@ -125,7 +125,7 @@ async def player_name_autocomplete(
                     if full_name:
                         full_names.append(full_name)
             except Exception as e:
-                print(f"[WARN] Error processing player name: {e}")
+                logger.warning(f"Error processing player name: {e}", exc_info=True)
                 continue
         
         if not full_names:
@@ -141,20 +141,18 @@ async def player_name_autocomplete(
                 app_commands.Choice(name=name, value=name)
                 for name in unique_names
                 if current_lower in name.lower()
-            ][:25]
+            ][:DISCORD_AUTOCOMPLETE_LIMIT]
         else:
-            # If no input, return first 25 names
+            # If no input, return first N names
             matches = [
                 app_commands.Choice(name=name, value=name)
-                for name in unique_names[:25]
+                for name in unique_names[:DISCORD_AUTOCOMPLETE_LIMIT]
             ]
         
         return matches
     except Exception as e:
         # Log error but return empty list to prevent Discord from showing error
-        print(f"[ERR] Error in player_name autocomplete: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Error in player_name autocomplete: {e}", exc_info=True)
         # Return empty list so Discord doesn't show error to user
         return []
 

@@ -4,7 +4,10 @@ import discord
 from discord import app_commands
 
 from config import DB_PATH, CHANNEL_ID
+from constants import DISCORD_FIELD_VALUE_LIMIT
 from db.queries import fetch_available_tracks
+from utils.errors import handle_command_error
+from utils.logging_config import logger
 
 
 def setup_tracks_command(tree: app_commands.CommandTree):
@@ -22,11 +25,12 @@ def setup_tracks_command(tree: app_commands.CommandTree):
 
         await interaction.response.defer(thinking=True)
 
-        con = sqlite3.connect(DB_PATH)
-        available = fetch_available_tracks(con)
-        con.close()
+        try:
+            con = sqlite3.connect(DB_PATH)
+            available = fetch_available_tracks(con)
+            con.close()
 
-        if not available:
+            if not available:
             embed = discord.Embed(
                 title="📍 Available Tracks",
                 description="No tracks found in the database yet.",
@@ -46,11 +50,11 @@ def setup_tracks_command(tree: app_commands.CommandTree):
             color=discord.Color.blue()
         )
         
-        # Format track list (Discord field value limit is 1024 characters)
+        # Format track list (Discord field value limit)
         track_list = "\n".join([f"• {name}" for name in sorted_tracks])
         
         # If track list is too long, split into multiple fields
-        if len(track_list) <= 1024:
+        if len(track_list) <= DISCORD_FIELD_VALUE_LIMIT:
             embed.add_field(
                 name="Track List",
                 value=track_list,
@@ -62,7 +66,7 @@ def setup_tracks_command(tree: app_commands.CommandTree):
             current_chunk = ""
             for name in sorted_tracks:
                 line = f"• {name}\n"
-                if len(current_chunk) + len(line) > 1024:
+                if len(current_chunk) + len(line) > DISCORD_FIELD_VALUE_LIMIT:
                     chunks.append(current_chunk.strip())
                     current_chunk = line
                 else:
@@ -79,7 +83,24 @@ def setup_tracks_command(tree: app_commands.CommandTree):
                     inline=False
                 )
         
-        embed.set_footer(text="💡 Use /records <trackname> to see top times for a track")
-        
-        await interaction.followup.send(embed=embed)
+            embed.set_footer(text="💡 Use /records <trackname> to see top times for a track")
+            
+            try:
+                await interaction.followup.send(embed=embed)
+            except Exception as e:
+                logger.error(f"Failed to send tracks embed: {e}", exc_info=True)
+                await handle_command_error(interaction, e, "sending the results")
+                
+        except sqlite3.Error as e:
+            try:
+                con.close()
+            except:
+                pass
+            await handle_command_error(interaction, e, "retrieving track list")
+        except Exception as e:
+            try:
+                con.close()
+            except:
+                pass
+            await handle_command_error(interaction, e, "processing your request")
 
