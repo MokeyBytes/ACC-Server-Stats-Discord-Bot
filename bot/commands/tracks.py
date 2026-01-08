@@ -7,6 +7,7 @@ from config import DB_PATH, CHANNEL_ID
 from constants import DISCORD_FIELD_VALUE_LIMIT
 from db.queries import fetch_available_tracks
 from utils.errors import handle_command_error, create_channel_restriction_embed
+from utils.formatting import format_track_name
 from utils.logging_config import logger
 
 
@@ -37,9 +38,9 @@ def setup_tracks_command(tree: app_commands.CommandTree) -> None:
             await interaction.followup.send(embed=embed)
             return
 
-        # Format track list
-        track_names = [t[0] for t in available]
-        sorted_tracks = sorted(track_names)
+            # Format track list - format names for display
+            track_names = [t[0] for t in available]
+            sorted_tracks = sorted([format_track_name(name) for name in track_names])
         
         # Create embed
         embed = discord.Embed(

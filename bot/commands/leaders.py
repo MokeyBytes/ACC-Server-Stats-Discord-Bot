@@ -6,7 +6,7 @@ from discord import app_commands
 from config import DB_PATH, CHANNEL_ID
 from constants import DISCORD_FIELD_VALUE_LIMIT, DISCORD_EMBED_FIELD_LIMIT, TRACKS_PER_FIELD, DEFAULT_TOP_TIMES_LIMIT
 from db.queries import fetch_all_tracks_top_times
-from utils.formatting import fmt_ms, fmt_dt, fmt_car_model, format_driver_name
+from utils.formatting import fmt_ms, fmt_dt, fmt_car_model, format_driver_name, format_track_name
 from utils.errors import handle_command_error, create_channel_restriction_embed
 from utils.logging_config import logger
 
@@ -40,7 +40,8 @@ def setup_leaders_command(tree: app_commands.CommandTree) -> None:
 
         # Helper function to format a track entry
         def format_track_entry(track, q_data, r_data):
-            lines = [f"**{track}**"]
+            formatted_track = format_track_name(track)
+            lines = [f"**{formatted_track}**"]
             
             # Qualifying
             if q_data:

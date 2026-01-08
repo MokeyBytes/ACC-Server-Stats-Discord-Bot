@@ -6,7 +6,7 @@ from discord import app_commands
 from config import DB_PATH, CHANNEL_ID
 from constants import DEFAULT_TOP_TIMES_LIMIT, MEDAL_EMOJIS
 from db.queries import find_track_match, fetch_track_top_times, fetch_available_tracks
-from utils.formatting import fmt_ms, fmt_dt, fmt_split_ms, fmt_car_model, format_driver_name
+from utils.formatting import fmt_ms, fmt_dt, fmt_split_ms, fmt_car_model, format_driver_name, format_track_name
 from utils.images import find_track_image
 from utils.errors import handle_command_error, create_error_embed, create_warning_embed, create_channel_restriction_embed
 from utils.logging_config import logger
@@ -56,10 +56,11 @@ def setup_records_command(tree: app_commands.CommandTree) -> None:
             con.close()
 
             if not q_times and not r_times:
+                formatted_track = format_track_name(actual_track)
                 embed = create_warning_embed(
                     title="No Times Found",
                     description=(
-                        f"No times found for track **{actual_track}** yet.\n\n"
+                        f"No times found for track **{formatted_track}** yet.\n\n"
                         f"*Times will appear here once drivers complete sessions on this track.*"
                     )
                 )
@@ -74,9 +75,12 @@ def setup_records_command(tree: app_commands.CommandTree) -> None:
             await handle_command_error(interaction, e, "processing your request")
             return
 
+        # Format track name for display
+        formatted_track = format_track_name(actual_track)
+        
         # Create embed
         embed = discord.Embed(
-            title=f"🏁 {actual_track}",
+            title=f"🏁 {formatted_track}",
             color=discord.Color.blue()
         )
         

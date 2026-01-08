@@ -124,10 +124,25 @@
   - All complex queries now have inline comments explaining the logic
 - **Files affected**: db/queries.py
 
-### 7. **Standardize Track Name Formatting**
+### 7. **Standardize Track Name Formatting** ✅ COMPLETED
 - **Issue**: Track names sometimes have underscores, sometimes spaces
 - **Solution**: Create a utility function to format track names consistently
-- **Files affected**: embeds.py, commands
+- **Status**: ✅ Implemented
+  - Created `format_track_name()` function in `utils/formatting.py`:
+    - Replaces underscores with spaces
+    - Applies title case (capitalizes first letter of each word)
+    - Handles edge cases (empty strings, None values)
+  - Updated all display locations to use the new function:
+    - `bot/embeds.py` - All embed builders (track records, personal bests, race results)
+    - `bot/commands/records.py` - Embed title and error messages
+    - `bot/commands/pb.py` - Embed description and error messages
+    - `bot/commands/leaders.py` - Track entry formatting
+    - `bot/commands/tracks.py` - Track list display
+  - All track names now display consistently:
+    - "barcelona_catalunya" → "Barcelona Catalunya"
+    - "spa_francorchamps" → "Spa Francorchamps"
+    - "silverstone_gp" → "Silverstone Gp"
+- **Files affected**: embeds.py, all command files
 
 ### 8. **Add Docstrings**
 - **Issue**: Some functions lack docstrings

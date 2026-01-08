@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from constants import MEDAL_EMOJIS, MAX_RACE_RESULTS_DISPLAY, TOP_3_POSITIONS
-from utils.formatting import fmt_ms, fmt_dt, fmt_split_ms, fmt_car_model, format_driver_name
+from utils.formatting import fmt_ms, fmt_dt, fmt_split_ms, fmt_car_model, format_driver_name, format_track_name
 from utils.images import find_track_image
 
 
@@ -28,8 +28,11 @@ def build_track_record_embed(
     # Add session type emoji
     session_emoji = "🏁" if stype == "Q" else "🏎️"
     
+    # Format track name for display
+    formatted_track = format_track_name(track)
+    
     # Build description with optional improvement subtitle
-    description = f"{session_emoji} **{track}** - {session_label}"
+    description = f"{session_emoji} **{formatted_track}** - {session_label}"
     if previous_record_ms is not None:
         improvement_ms = previous_record_ms - best_ms
         improvement_str = fmt_split_ms(improvement_ms)
@@ -96,8 +99,11 @@ def build_personal_best_embed(
     # Add session type emoji
     session_emoji = "🏁" if stype == "Q" else "🏎️"
     
+    # Format track name for display
+    formatted_track = format_track_name(track)
+    
     # Build description with optional rank change subtitle
-    description = f"{session_emoji} **{track}** - {session_label}"
+    description = f"{session_emoji} **{formatted_track}** - {session_label}"
     if previous_rank is not None and current_rank is not None and previous_rank > current_rank:
         positions_gained = previous_rank - current_rank
         description += f"\n**🚀 Moved up {positions_gained} position{'s' if positions_gained > 1 else ''} on the leaderboard!**"
@@ -154,6 +160,9 @@ def build_race_results_embed(
     """Build a Discord embed for race results."""
     track_name, session_type, server_name, is_wet, session_index, race_weekend_index, file_mtime_utc = session_data
     
+    # Format track name for display
+    formatted_track = format_track_name(track)
+    
     # Determine conditions
     conditions = "🌧️ Wet" if is_wet else "☀️ Dry"
     
@@ -166,7 +175,7 @@ def build_race_results_embed(
     
     # Create embed
     embed = discord.Embed(
-        title=f"🏁 Race Results - {track.title().replace('_', ' ')}",
+        title=f"🏁 Race Results - {formatted_track}",
         color=race_color,
         timestamp=datetime.now(timezone.utc)
     )

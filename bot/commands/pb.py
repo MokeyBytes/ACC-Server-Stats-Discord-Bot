@@ -10,7 +10,7 @@ from db.queries import (
     find_track_match, fetch_player_pb_with_sectors, fetch_track_record_with_sectors,
     get_player_rank, get_session_count, get_previous_pb
 )
-from utils.formatting import fmt_ms, fmt_dt, fmt_split_ms, fmt_car_model
+from utils.formatting import fmt_ms, fmt_dt, fmt_split_ms, fmt_car_model, format_track_name
 from utils.images import find_track_image
 from utils.errors import handle_command_error, create_warning_embed, create_channel_restriction_embed
 from utils.logging_config import logger
@@ -63,10 +63,11 @@ def setup_pb_command(tree: app_commands.CommandTree) -> None:
 
             if not q_pb and not r_pb:
                 con.close()
+                formatted_track = format_track_name(actual_track)
                 embed = create_warning_embed(
                     title="No Personal Bests Found",
                     description=(
-                        f"No personal bests found for **{player}** at **{actual_track}**.\n\n"
+                        f"No personal bests found for **{player}** at **{formatted_track}**.\n\n"
                         f"*Make sure you've spelled the name correctly. Use autocomplete to help find the correct name.*"
                     )
                 )
@@ -77,12 +78,15 @@ def setup_pb_command(tree: app_commands.CommandTree) -> None:
             q_record = fetch_track_record_with_sectors(con, actual_track, "Q")
             r_record = fetch_track_record_with_sectors(con, actual_track, "R")
 
+            # Format track name for display
+            formatted_track = format_track_name(actual_track)
+            
             # Create embed
-        embed = discord.Embed(
-            title=f"🎯 Personal Best: {player}",
-            description=f"🏁 **{actual_track}**",
-            color=discord.Color.green()
-        )
+            embed = discord.Embed(
+                title=f"🎯 Personal Best: {player}",
+                description=f"🏁 **{formatted_track}**",
+                color=discord.Color.green()
+            )
 
         # Add track image thumbnail
         img_filename, img_file = find_track_image(actual_track)

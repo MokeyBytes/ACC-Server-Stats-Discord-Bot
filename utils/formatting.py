@@ -81,3 +81,32 @@ def format_driver_name(first: str | None, last: str | None, short: str | None) -
         return short
     return "Unknown"
 
+
+def format_track_name(track_name: str) -> str:
+    """
+    Format a track name for display by replacing underscores with spaces and title-casing.
+    
+    Examples:
+        "barcelona_catalunya" -> "Barcelona Catalunya"
+        "spa_francorchamps" -> "Spa Francorchamps"
+        "Silverstone GP" -> "Silverstone Gp" (title case)
+    
+    Args:
+        track_name: Raw track name (may contain underscores or mixed case)
+    
+    Returns:
+        Formatted track name with spaces instead of underscores and title case
+    """
+    if not track_name:
+        return track_name
+    
+    # Replace underscores with spaces
+    formatted = track_name.replace('_', ' ')
+    
+    # Title case: capitalize first letter of each word
+    # Split into words, capitalize each, then rejoin
+    words = formatted.split()
+    formatted = ' '.join(word.capitalize() for word in words)
+    
+    return formatted
+
