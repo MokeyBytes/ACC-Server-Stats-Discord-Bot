@@ -13,7 +13,7 @@ from utils.logging_config import logger
 from bot.autocomplete import track_autocomplete
 
 
-def setup_records_command(tree: app_commands.CommandTree):
+def setup_records_command(tree: app_commands.CommandTree) -> None:
     """Register the /records command."""
     
     @tree.command(name="records", description=f"Show top {DEFAULT_TOP_TIMES_LIMIT} times for a specific track (Q and R)")

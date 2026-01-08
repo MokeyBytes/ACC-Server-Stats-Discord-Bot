@@ -1,5 +1,6 @@
 """Formatting utility functions."""
 from datetime import datetime, timezone, timedelta
+from typing import Union
 
 try:
     import pytz
@@ -10,7 +11,7 @@ except ImportError:
 from config import CAR_MODELS
 
 
-def fmt_car_model(car_model) -> str:
+def fmt_car_model(car_model: Union[int, None]) -> str:
     """Convert car model ID to name, or return 'Unknown' if not found."""
     if car_model is None:
         return "Unknown"

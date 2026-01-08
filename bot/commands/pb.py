@@ -17,7 +17,7 @@ from utils.logging_config import logger
 from bot.autocomplete import player_name_autocomplete, track_autocomplete
 
 
-def setup_pb_command(tree: app_commands.CommandTree):
+def setup_pb_command(tree: app_commands.CommandTree) -> None:
     """Register the /pb command."""
     
     @tree.command(name="pb", description="Show detailed personal best with sector breakdown for a player at a track")

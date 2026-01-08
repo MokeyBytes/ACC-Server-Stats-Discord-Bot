@@ -6,7 +6,7 @@ from config import CHANNEL_ID
 from constants import DEFAULT_TOP_TIMES_LIMIT
 
 
-def setup_help_command(tree: app_commands.CommandTree):
+def setup_help_command(tree: app_commands.CommandTree) -> None:
     """Register the /help command."""
     
     @tree.command(name="help", description="Show all available commands and how to use them")

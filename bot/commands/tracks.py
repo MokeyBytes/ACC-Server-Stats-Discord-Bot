@@ -10,7 +10,7 @@ from utils.errors import handle_command_error
 from utils.logging_config import logger
 
 
-def setup_tracks_command(tree: app_commands.CommandTree):
+def setup_tracks_command(tree: app_commands.CommandTree) -> None:
     """Register the /tracks command."""
     
     @tree.command(name="tracks", description="List all available tracks")

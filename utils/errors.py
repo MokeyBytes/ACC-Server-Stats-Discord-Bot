@@ -15,13 +15,13 @@ class DatabaseError(Exception):
 
 class UserFriendlyError(Exception):
     """Exception that should show a user-friendly message."""
-    def __init__(self, message: str, technical_details: str = None):
+    def __init__(self, message: str, technical_details: str | None = None) -> None:
         self.message = message
         self.technical_details = technical_details
         super().__init__(self.message)
 
 
-def create_error_embed(title: str, description: str, color: discord.Color = None) -> discord.Embed:
+def create_error_embed(title: str, description: str, color: discord.Color | None = None) -> discord.Embed:
     """
     Create a user-friendly error embed.
     

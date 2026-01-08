@@ -11,7 +11,7 @@ from utils.errors import handle_command_error
 from utils.logging_config import logger
 
 
-def setup_leaders_command(tree: app_commands.CommandTree):
+def setup_leaders_command(tree: app_commands.CommandTree) -> None:
     """Register the /leaders command."""
     
     @tree.command(name="leaders", description="Show top 1 Q and R time for all tracks")

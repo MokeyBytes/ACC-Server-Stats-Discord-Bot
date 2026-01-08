@@ -1,10 +1,11 @@
 """Database query functions."""
 import sqlite3
+from typing import Any
 from config import BATCH_SIZE
 from constants import DEFAULT_TOP_TIMES_LIMIT
 
 
-def fetch_queue(con: sqlite3.Connection):
+def fetch_queue(con: sqlite3.Connection) -> list[tuple[Any, ...]]:
     """Pull queued announcements and join to records for the extra fields."""
     return con.execute(
         """
@@ -63,7 +64,7 @@ def fetch_queue(con: sqlite3.Connection):
     ).fetchall()
 
 
-def mark_sent(con: sqlite3.Connection, announcement_id: int, message_id: int):
+def mark_sent(con: sqlite3.Connection, announcement_id: int, message_id: int) -> None:
     """Mark an announcement as sent."""
     con.execute(
         """
@@ -76,7 +77,7 @@ def mark_sent(con: sqlite3.Connection, announcement_id: int, message_id: int):
     con.commit()
 
 
-def find_track_match(con: sqlite3.Connection, track_input: str) -> str:
+def find_track_match(con: sqlite3.Connection, track_input: str) -> str | None:
     """Find the actual track name in DB that matches the input (case-insensitive)."""
     # Try exact case-insensitive match first
     result = con.execute(
@@ -109,7 +110,7 @@ def find_track_match(con: sqlite3.Connection, track_input: str) -> str:
     return None
 
 
-def fetch_track_top_times(con: sqlite3.Connection, track_name: str, limit: int = DEFAULT_TOP_TIMES_LIMIT):
+def fetch_track_top_times(con: sqlite3.Connection, track_name: str, limit: int = DEFAULT_TOP_TIMES_LIMIT) -> tuple[list[tuple[Any, ...]], list[tuple[Any, ...]]]:
     """Get top N times for a specific track, for both Q and R session types."""
     # Get top times for Qualifying
     q_times = con.execute(
@@ -158,7 +159,7 @@ def fetch_track_top_times(con: sqlite3.Connection, track_name: str, limit: int =
     return q_times, r_times
 
 
-def fetch_available_tracks(con: sqlite3.Connection):
+def fetch_available_tracks(con: sqlite3.Connection) -> list[tuple[str]]:
     """Get list of all tracks that have Q/R sessions with best lap times."""
     return con.execute(
         """
@@ -172,7 +173,7 @@ def fetch_available_tracks(con: sqlite3.Connection):
     ).fetchall()
 
 
-def fetch_all_players(con: sqlite3.Connection):
+def fetch_all_players(con: sqlite3.Connection) -> list[tuple[str, str]]:
     """Get list of all unique players (first_name, last_name) from entries."""
     return con.execute(
         """
@@ -187,7 +188,7 @@ def fetch_all_players(con: sqlite3.Connection):
     ).fetchall()
 
 
-def fetch_player_pbs(con: sqlite3.Connection, first_name: str, last_name: str):
+def fetch_player_pbs(con: sqlite3.Connection, first_name: str, last_name: str) -> list[tuple[Any, ...]]:
     """Get personal bests for a specific player across all tracks."""
     return con.execute(
         """
@@ -323,14 +324,14 @@ def get_previous_pb(con: sqlite3.Connection, track: str, session_type: str, curr
     return result[0] if result else None
 
 
-def calculate_performance_percentage(player_time: int, track_record: int) -> float:
+def calculate_performance_percentage(player_time: int, track_record: int | None) -> float | None:
     """Calculate how close player is to track record as a percentage. 100% = equal to record, >100% = slower."""
     if track_record is None or track_record == 0:
         return None
     return (player_time / track_record) * 100
 
 
-def fetch_all_tracks_top_times(con: sqlite3.Connection):
+def fetch_all_tracks_top_times(con: sqlite3.Connection) -> dict[str, dict[str, tuple[Any, ...] | None]]:
     """Get top 1 Q and R time for each track. Returns dict keyed by track name."""
     tracks_data = {}
     
@@ -398,7 +399,7 @@ def fetch_all_tracks_top_times(con: sqlite3.Connection):
     return tracks_data
 
 
-def fetch_race_results_queue(con: sqlite3.Connection):
+def fetch_race_results_queue(con: sqlite3.Connection) -> list[tuple[Any, ...]]:
     """Fetch pending race results announcements."""
     return con.execute(
         """
@@ -416,7 +417,7 @@ def fetch_race_results_queue(con: sqlite3.Connection):
     ).fetchall()
 
 
-def fetch_race_session_data(con: sqlite3.Connection, session_id: int):
+def fetch_race_session_data(con: sqlite3.Connection, session_id: int) -> tuple[tuple[Any, ...] | None, list[tuple[Any, ...]]]:
     """Fetch all data needed for race results embed."""
     # Get session info
     session = con.execute(
@@ -456,7 +457,7 @@ def fetch_race_session_data(con: sqlite3.Connection, session_id: int):
     return session, entries
 
 
-def fetch_player_pb_with_sectors(con: sqlite3.Connection, first_name: str, last_name: str, track: str, session_type: str):
+def fetch_player_pb_with_sectors(con: sqlite3.Connection, first_name: str, last_name: str, track: str, session_type: str) -> tuple[int, str | None, int | None, str] | None:
     """
     Get player's personal best for a specific track/session with sector data.
     Returns: (best_lap_ms, best_splits_json, car_model, set_at_utc) or None
@@ -485,7 +486,7 @@ def fetch_player_pb_with_sectors(con: sqlite3.Connection, first_name: str, last_
     return result
 
 
-def fetch_track_record_with_sectors(con: sqlite3.Connection, track: str, session_type: str):
+def fetch_track_record_with_sectors(con: sqlite3.Connection, track: str, session_type: str) -> tuple[int, str | None] | None:
     """
     Get track record with sector data.
     Returns: (best_lap_ms, best_splits_json) or None
@@ -510,7 +511,7 @@ def fetch_track_record_with_sectors(con: sqlite3.Connection, track: str, session
     return result
 
 
-def mark_race_results_sent(con: sqlite3.Connection, announcement_id: int, message_id: int):
+def mark_race_results_sent(con: sqlite3.Connection, announcement_id: int, message_id: int) -> None:
     """Mark a race results announcement as sent."""
     con.execute(
         """

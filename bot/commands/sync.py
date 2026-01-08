@@ -6,7 +6,7 @@ from utils.errors import handle_command_error, create_error_embed
 from utils.logging_config import logger
 
 
-def setup_sync_command(tree: app_commands.CommandTree):
+def setup_sync_command(tree: app_commands.CommandTree) -> None:
     """Register the /sync command."""
     
     @tree.command(name="sync", description="Manually sync slash commands (admin)")

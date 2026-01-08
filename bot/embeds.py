@@ -1,13 +1,24 @@
 """Discord embed builders."""
 import discord
 from datetime import datetime, timezone
+from typing import Any
 
 from constants import MEDAL_EMOJIS, MAX_RACE_RESULTS_DISPLAY, TOP_3_POSITIONS
 from utils.formatting import fmt_ms, fmt_dt, fmt_split_ms, fmt_car_model, format_driver_name
 from utils.images import find_track_image
 
 
-def build_track_record_embed(track, stype, best_ms, when_utc, first, last, short, car_model, previous_record_ms=None):
+def build_track_record_embed(
+    track: str,
+    stype: str,
+    best_ms: int,
+    when_utc: str,
+    first: str | None,
+    last: str | None,
+    short: str | None,
+    car_model: int | None,
+    previous_record_ms: int | None = None
+) -> tuple[discord.Embed, discord.File | None]:
     """Build a Discord embed for track record announcements."""
     session_label = "Qualifying" if stype == "Q" else "Race"
     who = format_driver_name(first, last, short)
@@ -64,7 +75,18 @@ def build_track_record_embed(track, stype, best_ms, when_utc, first, last, short
     return embed, None
 
 
-def build_personal_best_embed(track, stype, best_ms, when_utc, first, last, short, car_model, previous_rank=None, current_rank=None):
+def build_personal_best_embed(
+    track: str,
+    stype: str,
+    best_ms: int,
+    when_utc: str,
+    first: str | None,
+    last: str | None,
+    short: str | None,
+    car_model: int | None,
+    previous_rank: int | None = None,
+    current_rank: int | None = None
+) -> tuple[discord.Embed, discord.File | None]:
     """Build a Discord embed for personal best announcements."""
     session_label = "Qualifying" if stype == "Q" else "Race"
     who = format_driver_name(first, last, short)
@@ -123,7 +145,12 @@ def build_personal_best_embed(track, stype, best_ms, when_utc, first, last, shor
     return embed, None
 
 
-def build_race_results_embed(track, session_data, entries, when_utc):
+def build_race_results_embed(
+    track: str,
+    session_data: tuple[Any, ...],
+    entries: list[tuple[Any, ...]],
+    when_utc: str
+) -> tuple[discord.Embed, discord.File | None]:
     """Build a Discord embed for race results."""
     track_name, session_type, server_name, is_wet, session_index, race_weekend_index, file_mtime_utc = session_data
     
