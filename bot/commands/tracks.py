@@ -30,58 +30,58 @@ def setup_tracks_command(tree: app_commands.CommandTree) -> None:
             con.close()
 
             if not available:
-            embed = discord.Embed(
-                title="📍 Available Tracks",
-                description="No tracks found in the database yet.",
-                color=discord.Color.orange()
-            )
-            await interaction.followup.send(embed=embed)
-            return
+                embed = discord.Embed(
+                    title="📍 Available Tracks",
+                    description="No tracks found in the database yet.",
+                    color=discord.Color.orange()
+                )
+                await interaction.followup.send(embed=embed)
+                return
 
             # Format track list - format names for display
             track_names = [t[0] for t in available]
             sorted_tracks = sorted([format_track_name(name) for name in track_names])
         
-        # Create embed
-        embed = discord.Embed(
-            title="📍 Available Tracks",
-            description=f"**{len(sorted_tracks)}** track(s) available in the database",
-            color=discord.Color.blue()
-        )
-        
-        # Format track list (Discord field value limit)
-        track_list = "\n".join([f"• {name}" for name in sorted_tracks])
-        
-        # If track list is too long, split into multiple fields
-        if len(track_list) <= DISCORD_FIELD_VALUE_LIMIT:
-            embed.add_field(
-                name="Track List",
-                value=track_list,
-                inline=False
+            # Create embed
+            embed = discord.Embed(
+                title="📍 Available Tracks",
+                description=f"**{len(sorted_tracks)}** track(s) available in the database",
+                color=discord.Color.blue()
             )
-        else:
-            # Split into chunks
-            chunks = []
-            current_chunk = ""
-            for name in sorted_tracks:
-                line = f"• {name}\n"
-                if len(current_chunk) + len(line) > DISCORD_FIELD_VALUE_LIMIT:
-                    chunks.append(current_chunk.strip())
-                    current_chunk = line
-                else:
-                    current_chunk += line
-            if current_chunk:
-                chunks.append(current_chunk.strip())
             
-            # Add chunks as separate fields
-            for i, chunk in enumerate(chunks, 1):
-                field_name = "Track List" if i == 1 else f"Track List (continued {i})"
+            # Format track list (Discord field value limit)
+            track_list = "\n".join([f"• {name}" for name in sorted_tracks])
+            
+            # If track list is too long, split into multiple fields
+            if len(track_list) <= DISCORD_FIELD_VALUE_LIMIT:
                 embed.add_field(
-                    name=field_name,
-                    value=chunk,
+                    name="Track List",
+                    value=track_list,
                     inline=False
                 )
-        
+            else:
+                # Split into chunks
+                chunks = []
+                current_chunk = ""
+                for name in sorted_tracks:
+                    line = f"• {name}\n"
+                    if len(current_chunk) + len(line) > DISCORD_FIELD_VALUE_LIMIT:
+                        chunks.append(current_chunk.strip())
+                        current_chunk = line
+                    else:
+                        current_chunk += line
+                if current_chunk:
+                    chunks.append(current_chunk.strip())
+                
+                # Add chunks as separate fields
+                for i, chunk in enumerate(chunks, 1):
+                    field_name = "Track List" if i == 1 else f"Track List (continued {i})"
+                    embed.add_field(
+                        name=field_name,
+                        value=chunk,
+                        inline=False
+                    )
+            
             embed.set_footer(text="💡 Use /records <trackname> to see top times for a track")
             
             try:
