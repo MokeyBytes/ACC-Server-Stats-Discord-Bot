@@ -30,124 +30,124 @@ def setup_leaders_command(tree: app_commands.CommandTree) -> None:
             con.close()
 
             if not tracks_data:
-            embed = discord.Embed(
-                title="🏆 Server Leaders",
-                description="No track records found in the database yet.",
-                color=discord.Color.orange()
+                embed = discord.Embed(
+                    title="🏆 Server Leaders",
+                    description="No track records found in the database yet.",
+                    color=discord.Color.orange()
+                )
+                await interaction.followup.send(embed=embed)
+                return
+
+            # Helper function to format a track entry
+            def format_track_entry(track, q_data, r_data):
+                formatted_track = format_track_name(track)
+                lines = [f"**{formatted_track}**"]
+                
+                # Qualifying
+                if q_data:
+                    best_ms, first, last, short, car_model, set_at_utc = q_data
+                    who = format_driver_name(first, last, short)
+                    car_name = fmt_car_model(car_model)
+                    when = fmt_dt(set_at_utc) if set_at_utc else "Unknown"
+                    lines.append(f"🏁 **Q:** {fmt_ms(best_ms)} — {who}\n   `{car_name}` • {when}")
+                else:
+                    lines.append("🏁 **Q:** No times recorded")
+                
+                # Race
+                if r_data:
+                    best_ms, first, last, short, car_model, set_at_utc = r_data
+                    who = format_driver_name(first, last, short)
+                    car_name = fmt_car_model(car_model)
+                    when = fmt_dt(set_at_utc) if set_at_utc else "Unknown"
+                    lines.append(f"🏎️ **R:** {fmt_ms(best_ms)} — {who}\n   `{car_name}` • {when}")
+                else:
+                    lines.append("🏎️ **R:** No times recorded")
+                
+                return "\n".join(lines)
+
+            # Create embeds with organized fields
+            # Discord embed field value limit is 1024 characters
+            # We'll group tracks per field for readability
+            embeds = []
+            current_embed = discord.Embed(
+                title="🏆 Server Leaders - All Tracks",
+                description=f"Top Qualifying and Race times across **{len(tracks_data)}** track(s)",
+                color=discord.Color.gold()
             )
-            await interaction.followup.send(embed=embed)
-            return
-
-        # Helper function to format a track entry
-        def format_track_entry(track, q_data, r_data):
-            formatted_track = format_track_name(track)
-            lines = [f"**{formatted_track}**"]
             
-            # Qualifying
-            if q_data:
-                best_ms, first, last, short, car_model, set_at_utc = q_data
-                who = format_driver_name(first, last, short)
-                car_name = fmt_car_model(car_model)
-                when = fmt_dt(set_at_utc) if set_at_utc else "Unknown"
-                lines.append(f"🏁 **Q:** {fmt_ms(best_ms)} — {who}\n   `{car_name}` • {when}")
-            else:
-                lines.append("🏁 **Q:** No times recorded")
+            current_field_value = ""
+            tracks_in_current_field = 0
+            field_count = 0
+            track_number = 0
             
-            # Race
-            if r_data:
-                best_ms, first, last, short, car_model, set_at_utc = r_data
-                who = format_driver_name(first, last, short)
-                car_name = fmt_car_model(car_model)
-                when = fmt_dt(set_at_utc) if set_at_utc else "Unknown"
-                lines.append(f"🏎️ **R:** {fmt_ms(best_ms)} — {who}\n   `{car_name}` • {when}")
-            else:
-                lines.append("🏎️ **R:** No times recorded")
-            
-            return "\n".join(lines)
-
-        # Create embeds with organized fields
-        # Discord embed field value limit is 1024 characters
-        # We'll group tracks per field for readability
-        embeds = []
-        current_embed = discord.Embed(
-            title="🏆 Server Leaders - All Tracks",
-            description=f"Top Qualifying and Race times across **{len(tracks_data)}** track(s)",
-            color=discord.Color.gold()
-        )
-        
-        current_field_value = ""
-        tracks_in_current_field = 0
-        field_count = 0
-        track_number = 0
-        
-        for track in sorted(tracks_data.keys()):
-            track_number += 1
-            q_data = tracks_data[track].get('q')
-            r_data = tracks_data[track].get('r')
-            
-            track_entry = format_track_entry(track, q_data, r_data)
-            
-            # Check if we need a new embed (Discord field limit per embed)
-            if field_count >= DISCORD_EMBED_FIELD_LIMIT:
-                # Save current field if it has content
+            for track in sorted(tracks_data.keys()):
+                track_number += 1
+                q_data = tracks_data[track].get('q')
+                r_data = tracks_data[track].get('r')
+                
+                track_entry = format_track_entry(track, q_data, r_data)
+                
+                # Check if we need a new embed (Discord field limit per embed)
+                if field_count >= DISCORD_EMBED_FIELD_LIMIT:
+                    # Save current field if it has content
+                    if current_field_value:
+                        start_track = track_number - tracks_in_current_field
+                        end_track = track_number - 1
+                        current_embed.add_field(
+                            name=f"Tracks {start_track}-{end_track}",
+                            value=current_field_value.strip(),
+                            inline=False
+                        )
+                    
+                    # Create new embed
+                    embeds.append(current_embed)
+                    current_embed = discord.Embed(
+                        title="🏆 Server Leaders (continued)",
+                        color=discord.Color.gold()
+                    )
+                    field_count = 0
+                    current_field_value = ""
+                    tracks_in_current_field = 0
+                
+                # Add track to current field
                 if current_field_value:
-                    start_track = track_number - tracks_in_current_field
-                    end_track = track_number - 1
+                    current_field_value += "\n\n" + track_entry
+                else:
+                    current_field_value = track_entry
+                
+                tracks_in_current_field += 1
+                
+                # Check if we should finalize this field (after TRACKS_PER_FIELD tracks or if next would exceed limit)
+                test_next_entry = ""
+                if track_number < len(tracks_data):
+                    next_track = sorted(tracks_data.keys())[track_number]
+                    next_q = tracks_data[next_track].get('q')
+                    next_r = tracks_data[next_track].get('r')
+                    test_next_entry = "\n\n" + format_track_entry(next_track, next_q, next_r)
+                
+                should_finalize = (
+                    tracks_in_current_field >= TRACKS_PER_FIELD or
+                    len(current_field_value + test_next_entry) > DISCORD_FIELD_VALUE_LIMIT
+                )
+                
+                if should_finalize or track_number == len(tracks_data):
+                    start_track = track_number - tracks_in_current_field + 1
+                    end_track = track_number
+                    field_name = f"Tracks {start_track}-{end_track}" if start_track != end_track else f"Track {start_track}"
+                    
                     current_embed.add_field(
-                        name=f"Tracks {start_track}-{end_track}",
+                        name=field_name,
                         value=current_field_value.strip(),
                         inline=False
                     )
-                
-                # Create new embed
-                embeds.append(current_embed)
-                current_embed = discord.Embed(
-                    title="🏆 Server Leaders (continued)",
-                    color=discord.Color.gold()
-                )
-                field_count = 0
-                current_field_value = ""
-                tracks_in_current_field = 0
+                    field_count += 1
+                    current_field_value = ""
+                    tracks_in_current_field = 0
             
-            # Add track to current field
-            if current_field_value:
-                current_field_value += "\n\n" + track_entry
-            else:
-                current_field_value = track_entry
+            # Add footer to last embed
+            final_embed = embeds[-1] if embeds else current_embed
+            final_embed.set_footer(text=f"💡 Use /records <track> to see top {DEFAULT_TOP_TIMES_LIMIT} times for a specific track")
             
-            tracks_in_current_field += 1
-            
-            # Check if we should finalize this field (after TRACKS_PER_FIELD tracks or if next would exceed limit)
-            test_next_entry = ""
-            if track_number < len(tracks_data):
-                next_track = sorted(tracks_data.keys())[track_number]
-                next_q = tracks_data[next_track].get('q')
-                next_r = tracks_data[next_track].get('r')
-                test_next_entry = "\n\n" + format_track_entry(next_track, next_q, next_r)
-            
-            should_finalize = (
-                tracks_in_current_field >= TRACKS_PER_FIELD or
-                len(current_field_value + test_next_entry) > DISCORD_FIELD_VALUE_LIMIT
-            )
-            
-            if should_finalize or track_number == len(tracks_data):
-                start_track = track_number - tracks_in_current_field + 1
-                end_track = track_number
-                field_name = f"Tracks {start_track}-{end_track}" if start_track != end_track else f"Track {start_track}"
-                
-                current_embed.add_field(
-                    name=field_name,
-                    value=current_field_value.strip(),
-                    inline=False
-                )
-                field_count += 1
-                current_field_value = ""
-                tracks_in_current_field = 0
-        
-        # Add footer to last embed
-        final_embed = embeds[-1] if embeds else current_embed
-        final_embed.set_footer(text=f"💡 Use /records <track> to see top {DEFAULT_TOP_TIMES_LIMIT} times for a specific track")
-        
             # Send all embeds
             try:
                 if embeds:
