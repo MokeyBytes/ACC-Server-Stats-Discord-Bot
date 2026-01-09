@@ -40,7 +40,7 @@ def setup_help_command(tree: app_commands.CommandTree) -> None:
             players = fetch_all_players(con)
             if players:
                 first_name, last_name = players[0]
-                example_player = format_driver_name(first_name, last_name)
+                example_player = format_driver_name(first_name, last_name, None)
             
             con.close()
         except Exception as e:
