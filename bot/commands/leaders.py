@@ -91,10 +91,8 @@ def setup_leaders_command(tree: app_commands.CommandTree) -> None:
                 if field_count >= DISCORD_EMBED_FIELD_LIMIT:
                     # Save current field if it has content
                     if current_field_value:
-                        start_track = track_number - tracks_in_current_field
-                        end_track = track_number - 1
                         current_embed.add_field(
-                            name=f"Tracks {start_track}-{end_track}",
+                            name="Track Records",
                             value=current_field_value.strip(),
                             inline=False
                         )
@@ -131,12 +129,8 @@ def setup_leaders_command(tree: app_commands.CommandTree) -> None:
                 )
                 
                 if should_finalize or track_number == len(tracks_data):
-                    start_track = track_number - tracks_in_current_field + 1
-                    end_track = track_number
-                    field_name = f"Tracks {start_track}-{end_track}" if start_track != end_track else f"Track {start_track}"
-                    
                     current_embed.add_field(
-                        name=field_name,
+                        name="Track Records",
                         value=current_field_value.strip(),
                         inline=False
                     )
